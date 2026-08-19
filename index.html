@@ -529,6 +529,7 @@ var S = {
   timer: null,
   fileRows: null,
   logo: '',
+  frame: null,       // 滚动时屏幕上正显示的这一组人 —— 按下停止就是他们中奖
   shown: null,       // 当前屏上已揭晓的人,resize 时用来重画而不是清空
   revealing: false   // 揭晓动画进行中,期间忽略 resize
 };
@@ -548,6 +549,19 @@ function randInt(max){
   var u = new Uint32Array(1), limit = Math.floor(4294967296 / max) * max, v;
   do { crypto.getRandomValues(u); v = u[0]; } while (v >= limit);
   return v % max;
+}
+/* 滚动时每帧用:随机取 n 个互不重复的人。
+   n 远小于名单长度,拒绝采样足够快,不必像 pickMany 那样整表洗牌。 */
+function pickDistinct(arr, n){
+  n = Math.min(n, arr.length);
+  if (n >= arr.length) return arr.slice();
+  var out = [], seen = {};
+  while (out.length < n){
+    var i = randInt(arr.length);
+    if (seen[i]) continue;
+    seen[i] = 1; out.push(arr[i]);
+  }
+  return out;
 }
 function pickMany(arr, n){
   var idx = arr.map(function(_, i){ return i; });
@@ -798,7 +812,7 @@ function sizeFor(n){
   return {nm:'clamp(14px,1.7vw,22px)', sub:'10px', cols:5};
 }
 function resetStage(){
-  S.shown = null; S.revealing = false;
+  S.frame = null; S.shown = null; S.revealing = false;
   var t = tierById(S.activeTier);
   var slots = $('#slots');
   slots.innerHTML = '';
@@ -887,7 +901,7 @@ function startRoll(){
   if (wonIn(t.id) >= t.quota){ toast('รางวัลนี้ครบแล้ว · 该奖项已抽满'); return; }
 
   var rank = tierRank(t.id);
-  S.shown = null; S.revealing = false;
+  S.frame = null; S.shown = null; S.revealing = false;
   S.rolling = true;
   S.rank = rank;
   soundRollStart(rank);
@@ -896,7 +910,7 @@ function startRoll(){
   cru.classList.add('hot');
   cru.classList.toggle('finale', rank > 0.99);
 
-  var n = slotCount(), sz = sizeFor(n);
+  var n = Math.min(slotCount(), S.pool.length), sz = sizeFor(n);
   var slots = $('#slots');
   slots.innerHTML = '';
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
@@ -907,6 +921,8 @@ function startRoll(){
     slots.appendChild(card);
   }
   var cards = slots.querySelectorAll('.nm');
+  S.frame = pickDistinct(S.pool, n);
+  for (var k = 0; k < cards.length; k++) cards[k].textContent = S.frame[k].name;
 
   S.t0 = performance.now();
   var lastSwap = 0;
@@ -926,8 +942,11 @@ function startRoll(){
     var gap = 74 - 40 * e;
     if (now - lastSwap >= gap){
       lastSwap = now;
+      /* 所见即所得:这一帧显示谁,此刻按下停止中的就是谁。
+         同一帧内保证不重复,不会出现一个人占两格。 */
+      S.frame = pickDistinct(S.pool, cards.length);
       for (var c = 0; c < cards.length; c++){
-        cards[c].textContent = S.pool[randInt(S.pool.length)].name;
+        cards[c].textContent = S.frame[c].name;
       }
     }
     S.raf = requestAnimationFrame(frame);
@@ -950,7 +969,11 @@ function stopRoll(){
 
   var t = tierById(S.activeTier);
   var n = Math.min(slotCount(), S.pool.length);
-  var picked = pickMany(S.pool, n);
+  /* 定格在屏幕当前显示的那一组人。每一帧本来就是 crypto 随机抽的,
+     一帧只停留 34-74 毫秒,远短于人的反应误差,卡不住任何人。
+     S.frame 意外为空时(还没来得及画第一帧)才现抽一次兜底。 */
+  var picked = (S.frame && S.frame.length === n) ? S.frame : pickMany(S.pool, n);
+  S.frame = null;
 
   picked.forEach(function(p){
     S.pool.splice(S.pool.indexOf(p), 1);

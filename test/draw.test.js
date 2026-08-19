@@ -97,6 +97,28 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       await page.click('#bPour');
       await page.waitForTimeout(900 + picks * 650 + 900);      // 等揭晓动画走完
     }
+    // ---------- 3.5 所见即所得 ----------
+    // 在同一个 evaluate 里读屏幕再停止,中间不可能插进一帧,断言是确定的
+    const wysiwyg = await page.evaluate(async () => {
+      startRoll();
+      await new Promise(r => setTimeout(r, 1200));
+      const onScreen = [...document.querySelectorAll('#slots .nm')].map(n => n.textContent);
+      const frame = S.frame.map(p => p.name);
+      const n = S.winners.length;
+      stopRoll();
+      return { onScreen, frame, picked: S.winners.slice(n).map(w => w.name) };
+    });
+    R.check('停止时定格在屏幕当前显示的人(所见即所得)',
+            JSON.stringify(wysiwyg.onScreen) === JSON.stringify(wysiwyg.picked),
+            wysiwyg.onScreen.join(',') + ' → ' + wysiwyg.picked.join(','));
+    R.check('滚动时同一帧不出现重复的人',
+            new Set(wysiwyg.frame).size === wysiwyg.frame.length, wysiwyg.frame.join(','));
+    await page.waitForTimeout(4500);
+    await page.evaluate(() => { document.querySelector('#bUndo').click(); });
+    await page.waitForTimeout(300);
+    R.check('撤销掉这一轮,回到干净状态',
+            await page.evaluate(() => S.winners.length === 0 && S.pool.length === 60));
+
     const cum = [];
     for (const picks of [5, 5, 3, 1]) {
       await drawRound(picks);
