@@ -1,0 +1,15 @@
+{
+  "name": "lucky-draw",
+  "version": "1.0.0",
+  "private": true,
+  "description": "จับรางวัล · 幸运抽奖 PWA —— 应用本身是纯静态的,这个 package.json 只服务于测试",
+  "scripts": {
+    "test": "node test/run.js",
+    "test:draw": "node test/run.js draw",
+    "test:storage": "node test/run.js storage"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "xlsx": "^0.18.5"
+  }
+}

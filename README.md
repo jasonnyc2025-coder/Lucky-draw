@@ -16,9 +16,24 @@
 | 文件 | 作用 |
 |---|---|
 | `index.html` | 程序本体,全部逻辑与样式 |
+| `test/` | 端到端测试,不参与部署 |
 | `manifest.webmanifest` | 应用名称、图标、启动方式 |
 | `sw.js` | Service Worker,离线缓存 |
 | `icon-*.png` `apple-touch-icon.png` `favicon-64.png` | 图标 |
+
+## 测试
+
+```bash
+npm install
+npx playwright install chromium    # 只需一次
+npm test
+```
+
+44 项端到端测试,用真实浏览器跑完整流程(导入 → 开奖 → 名单 → 导出 → 存档 → 恢复),
+另外会真的关掉页面再打开,验证本机存档没丢。详见 [`test/README.md`](test/README.md)。
+
+应用本身仍然是零构建的纯静态页面,`package.json` 和 `node_modules` 只服务于测试,
+不影响部署。
 
 ## 改版本
 
