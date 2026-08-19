@@ -1,6 +1,6 @@
 /* จับรางวัล · 抽奖 — service worker
    改动这个文件时把 VERSION 加一,用户下次打开会收到更新提示。 */
-const VERSION = 'v6';
+const VERSION = 'v7';
 const CORE = 'draw-core-' + VERSION;
 const RUNTIME = 'draw-runtime-' + VERSION;
 
@@ -36,6 +36,8 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => {
   if (e.data === 'skip-waiting') self.skipWaiting();
+  /* 页面问「你缓存的是哪个版本」。页面版本和这个对不上 = 用户看到的是旧缓存。 */
+  if (e.data === 'version' && e.source) e.source.postMessage({ type: 'sw-version', version: VERSION });
 });
 
 /* 外部资源:泰文/中文字体、Excel 解析库。

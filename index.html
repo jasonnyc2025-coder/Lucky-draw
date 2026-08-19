@@ -448,10 +448,16 @@ td input{padding:9px 10px;font-size:15px}
     <div class="panel-b">
 
       <div class="sec">
+        <div class="sec-h">เวอร์ชัน · 版本</div>
+        <p class="hint" style="margin-top:0" id="verNote">…</p>
+      </div>
+
+      <div class="sec">
         <div class="sec-h">แอป · 应用</div>
         <div class="row">
           <button class="solid" id="bInstall2" style="display:none">ติดตั้งลงเครื่อง 安装到设备</button>
           <button class="ghost" id="bUpdate" style="display:none">มีเวอร์ชันใหม่ 有新版本,点此更新</button>
+          <button class="ghost" id="bCheckUpd">ตรวจหาอัปเดต 检查更新</button>
           <span class="hint" style="margin:0" id="swNote">กำลังตรวจสอบ… 检查中…</span>
         </div>
         <p class="hint">安装后可脱离浏览器独立运行,断网也能用。<br>
@@ -517,6 +523,21 @@ td input{padding:9px 10px;font-size:15px}
 
 <script>
 'use strict';
+
+/* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
+   两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
+var APP_VERSION = 'v7';
+var APP_DATE = '2026-08-19';
+var swVersion = null;
+
+function renderVersion(){
+  var n = $('#verNote'); if (!n) return;
+  var line = '版本 ' + APP_VERSION + ' · ' + APP_DATE;
+  if (swVersion === null)      line += '  ·  离线缓存:未启用或检查中';
+  else if (swVersion === APP_VERSION) line += '  ·  离线缓存 ' + swVersion + ' ✓ 已是最新';
+  else line += '  ·  ⚠ 离线缓存还是 ' + swVersion + ',你看到的可能是旧版,点下面「检查更新」';
+  n.textContent = line;
+}
 
 /* ---------- state ---------- */
 var S = {
@@ -1516,6 +1537,7 @@ $('#bClearStore').onclick = function(){
   });
 };
 
+renderVersion();
 syncActive();
 renderRail();
 resetStage();
@@ -1571,7 +1593,28 @@ bootRestore();
     return;
   }
 
+  navigator.serviceWorker.addEventListener('message', function(e){
+    if (e.data && e.data.type === 'sw-version'){ swVersion = e.data.version; renderVersion(); }
+  });
+  function askVersion(){
+    var c = navigator.serviceWorker.controller;
+    if (c) c.postMessage('version');
+  }
+  navigator.serviceWorker.ready.then(askVersion);
+  askVersion();
+
   navigator.serviceWorker.register('./sw.js').then(function(reg){
+    $('#bCheckUpd').onclick = function(){
+      toast('กำลังตรวจสอบ · 正在检查更新…');
+      reg.update().then(function(){
+        askVersion();
+        setTimeout(function(){
+          if ($('#bUpdate').style.display === 'none'){
+            toast('เป็นเวอร์ชันล่าสุดแล้ว · 已是最新版 ' + APP_VERSION);
+          }
+        }, 1200);
+      }).catch(function(){ toast('ตรวจสอบไม่สำเร็จ · 检查失败,可能没联网'); });
+    };
     if (standalone) setNote('พร้อมใช้ออฟไลน์ · 已安装,可离线使用');
     else setNote(navigator.onLine ? 'พร้อมใช้ออฟไลน์ · 离线可用已就绪' : 'ออฟไลน์ · 当前离线,正常运行');
 
