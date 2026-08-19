@@ -1104,8 +1104,8 @@ function renderWinners(){
     g.appendChild(el('div','wgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน'));
     ws.forEach(function(x, i){
       var r = el('div','wrow');
-      r.appendChild(el('b', (i+1) + '.  ' + x.name));
-      if (x.sub) r.appendChild(el('span', x.sub));
+      r.appendChild(el('b', null, (i+1) + '.  ' + x.name));
+      if (x.sub) r.appendChild(el('span', null, x.sub));
       g.appendChild(r);
     });
     w.appendChild(g);
