@@ -384,9 +384,9 @@ td input{padding:9px 10px;font-size:15px}
       <span class="cn">幸运抽奖</span>
     </div>
     <div class="tally">เหลือ 剩余 <b id="tRemain">0</b> / <span id="tTotal">0</span></div>
-    <button class="tbtn" id="bNames">รายชื่อ 名单</button>
     <button class="tbtn" id="bWinners">ผู้โชคดี 中奖</button>
     <button class="tbtn" id="bTiers">รางวัล 奖项</button>
+    <button class="tbtn" id="bNames">รายชื่อ 名单</button>
     <button class="tbtn" id="bInstall" style="display:none">⬇ ติดตั้ง 安装</button>
     <button class="tbtn" id="bSetup">ตั้งค่า 设置</button>
     <button class="tbtn icon" id="bSound">🔊</button>
@@ -440,7 +440,7 @@ td input{padding:9px 10px;font-size:15px}
 
       <div class="sec">
         <div class="sec-h">หรือวางรายชื่อ · 或直接粘贴(一行一人,可用逗号加工号)</div>
-        <textarea id="paste" placeholder="สมชาย ใจดี, EMP001&#10;กมลรัตน์ ศรีสุข, EMP002&#10;李伟, EMP003"></textarea>
+        <textarea id="paste"></textarea>
         <div class="row" style="margin-top:12px">
           <button class="solid" id="bApplyPaste">ใช้รายชื่อนี้ 使用此名单</button>
           <span class="hint" style="margin:0" id="poolNote"></span>
@@ -569,7 +569,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v11';
+var APP_VERSION = 'v12';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
