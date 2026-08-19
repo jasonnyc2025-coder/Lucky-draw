@@ -101,6 +101,21 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     for (const picks of [5, 5, 3, 1]) {
       await drawRound(picks);
       cum.push(await page.evaluate(() => S.winners.length));
+
+      if (cum.length === 1) {
+        // 回归:手机上地址栏收起/转屏会触发 resize,以前会把刚揭晓的名字冲成「?」
+        const shown = () => page.evaluate(() =>
+          [...document.querySelectorAll('#slots .nm')].map(n => n.textContent));
+        const before = await shown();
+        for (const [w, h] of [[900, 700], [1280, 860]]) {
+          await page.setViewportSize({ width: w, height: h });
+          await page.waitForTimeout(350);
+        }
+        const after = await shown();
+        R.check('改变窗口尺寸后已揭晓的名字还在(不会变成 ?)',
+                JSON.stringify(before) === JSON.stringify(after) && !after.includes('?'),
+                before.join(',') + ' → ' + after.join(','));
+      }
     }
 
     const st = await page.evaluate(() => ({

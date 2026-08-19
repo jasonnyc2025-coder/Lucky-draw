@@ -184,6 +184,7 @@ input,select{font:inherit;color:inherit}
   border-color:#EFF3F6;color:#171310;
   box-shadow:0 14px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.85);
 }
+.ingot.cast.still::after{content:none}
 .ingot.cast::after,.ingot.molten::after{
   content:'';position:absolute;top:0;bottom:0;width:46%;
   background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);
@@ -527,7 +528,9 @@ var S = {
   rolling: false,
   timer: null,
   fileRows: null,
-  logo: ''
+  logo: '',
+  shown: null,       // 当前屏上已揭晓的人,resize 时用来重画而不是清空
+  revealing: false   // 揭晓动画进行中,期间忽略 resize
 };
 var uid = 0;
 
@@ -795,6 +798,7 @@ function sizeFor(n){
   return {nm:'clamp(14px,1.7vw,22px)', sub:'10px', cols:5};
 }
 function resetStage(){
+  S.shown = null; S.revealing = false;
   var t = tierById(S.activeTier);
   var slots = $('#slots');
   slots.innerHTML = '';
@@ -832,6 +836,31 @@ function resetStage(){
   }
   updateControls();
 }
+/* 屏幕尺寸变了(手机地址栏收起、转屏)时,把已揭晓的名字按新尺寸重画一遍。
+   以前这里直接 resetStage(),刚抽出来的名字会被冲成「?」。 */
+function renderShown(){
+  if (!S.shown || !S.shown.length) return false;
+  var keep = $('#eyebrow').innerHTML;
+  var slots = $('#slots');
+  slots.innerHTML = ''; slots.style.transform = '';
+  var cru = $('#crucible');
+  cru.classList.remove('hot','hush','finale');
+  cru.style.setProperty('--heat', 0);
+  $('#chargeFill').style.width = '0%';
+
+  var n = S.shown.length, sz = sizeFor(n);
+  slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
+  S.shown.forEach(function(p){
+    var c = el('div','ingot cast still');
+    var nm = el('div','nm', p.name); nm.style.fontSize = sz.nm;
+    c.appendChild(nm);
+    if (p.sub){ var sb = el('div','sub', p.sub); sb.style.fontSize = sz.sub; c.appendChild(sb); }
+    slots.appendChild(c);
+  });
+  $('#eyebrow').innerHTML = keep;
+  updateControls();
+  return true;
+}
 function updateControls(){
   var t = tierById(S.activeTier);
   var canDraw = !!(t && S.pool.length && wonIn(t.id) < t.quota);
@@ -858,6 +887,7 @@ function startRoll(){
   if (wonIn(t.id) >= t.quota){ toast('รางวัลนี้ครบแล้ว · 该奖项已抽满'); return; }
 
   var rank = tierRank(t.id);
+  S.shown = null; S.revealing = false;
   S.rolling = true;
   S.rank = rank;
   soundRollStart(rank);
@@ -928,6 +958,7 @@ function stopRoll(){
   });
   S.history.push({tierId:t.id, people:picked});
   autosave();
+  S.shown = picked; S.revealing = true;
 
   var cards = slots.querySelectorAll('.ingot');
   var sz = sizeFor(n);
@@ -964,6 +995,7 @@ function stopRoll(){
         setTimeout(fanfare, 300);
       }
     }
+    S.revealing = false;
     renderRail();
   }, HUSH + picked.length * STEP + 300);
 }
@@ -1428,7 +1460,11 @@ document.addEventListener('keydown', function(e){
   }
   if (e.key === 'f' || e.key === 'F'){ $('#bFull').click(); }
 });
-window.addEventListener('resize', function(){ if (!S.rolling) resetStage(); });
+window.addEventListener('resize', function(){
+  if (S.rolling || S.revealing) return;      // 正在转 / 正在逐个揭晓,别插手
+  if (renderShown()) return;                 // 已揭晓的那一屏:按新尺寸重画,不清空
+  resetStage();
+});
 
 $('#autoSave').checked = autoOn;
 $('#autoSave').onchange = function(){
