@@ -269,6 +269,18 @@ input,select{font:inherit;color:inherit}
 .ghost:disabled{opacity:.55;cursor:not-allowed}
 .ghost:focus-visible{outline:2px solid var(--pour);outline-offset:2px}
 
+/* 抽奖滚动和揭晓时收起周边,只留中间的舞台:
+   投影上名字能占更多地方,也不会在关键时刻误触到重置。 */
+.app.focus .topbar,
+.app.focus .rail,
+.app.focus .ghost{display:none}
+.app.focus .main{grid-template-columns:1fr;grid-template-rows:1fr}
+.app.focus .controls{
+  padding:16px 22px 22px;border-top-color:transparent;
+  background:linear-gradient(0deg,rgba(0,0,0,.45),transparent);
+}
+.app.focus .pour{min-width:0;width:100%;max-width:720px}
+
 /* ---------- drawer / modal ---------- */
 .veil{
   position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.72);
@@ -578,7 +590,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v13';
+var APP_VERSION = 'v16';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -860,14 +872,24 @@ function renderRail(){
     b.appendChild(n);
     b.onclick = function(){
       if (S.rolling) return;
-      if (locked){
-        toast('ต้องจับตามลำดับ · 请按顺序,先抽完「' + S.tiers[cur].zh + '」');
+      /* 锁定与否在点的那一刻重新算。用渲染时捕获的闭包值,
+         中途状态变了(恢复进度、改奖项)就会算错。 */
+      var now = currentIndex(), head = now >= 0 ? S.tiers[now] : null;
+      if (head && tierIndex(t.id) > now){
+        toast('ต้องจับตามลำดับ · 请按顺序,先抽完「' + head.zh + '」');
         return;
       }
       S.activeTier = t.id; renderRail(); resetStage();
     };
     rail.appendChild(b);
   });
+  /* 手机上奖项列表是一条横向滚动带,换档后必须把当前这一档滚进视野 ——
+     否则台上抽的是二等奖,顶上还停在已经抽完的三等奖。 */
+  var curBtn = rail.querySelector('.tier.on');
+  if (curBtn && curBtn.scrollIntoView){
+    try { curBtn.scrollIntoView({ block:'nearest', inline:'center', behavior:'smooth' }); }
+    catch (e){ curBtn.scrollIntoView(false); }
+  }
   updateControls();
 }
 
@@ -885,6 +907,12 @@ function sizeFor(n){
   if (n <= 12) return {nm:'clamp(16px,2.1vw,28px)', sub:'11px', cols:4};
   return {nm:'clamp(14px,1.7vw,22px)', sub:'10px', cols:5};
 }
+/* 只留中间舞台的专注模式 */
+function setFocus(on){
+  var app = document.querySelector('.app');
+  if (app) app.classList.toggle('focus', !!on);
+}
+
 function esc(t){
   return String(t == null ? '' : t).replace(/[&<>]/g, function(c){
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c];
@@ -898,6 +926,7 @@ function eyebrow(main, sub){
 
 function resetStage(){
   S.frame = null; S.shown = null; S.revealing = false;
+  setFocus(false);
   var t = tierById(S.activeTier);
   var slots = $('#slots');
   slots.innerHTML = '';
@@ -972,14 +1001,21 @@ function allDone(){
 }
 /* 一屏放不下就把字号往下降一档,降到最小还放不下才允许滚动 */
 function fitBoard(board){
-  var cru = $('#crucible'), eb = $('#eyebrow');
-  var avail = cru.clientHeight - eb.offsetHeight - 56;
-  board.style.maxHeight = Math.max(160, avail) + 'px';
-  var sizes = [40, 34, 29, 25, 21, 18, 15, 13, 11];
-  for (var i = 0; i < sizes.length; i++){
-    board.style.setProperty('--bfs', sizes[i] + 'px');
-    if (board.scrollHeight <= board.clientHeight) break;
+  function run(){
+    var cru = $('#crucible'), eb = $('#eyebrow');
+    var avail = cru.clientHeight - eb.offsetHeight - 56;
+    board.style.maxHeight = Math.max(160, avail) + 'px';
+    var sizes = [40, 34, 29, 25, 21, 18, 15, 13, 11];
+    for (var i = 0; i < sizes.length; i++){
+      board.style.setProperty('--bfs', sizes[i] + 'px');
+      void board.offsetHeight;                  // 强制回流,别读到上一档的旧高度
+      if (board.scrollHeight <= board.clientHeight) break;
+    }
   }
+  run();
+  /* 转屏或改窗口尺寸时,第一遍可能量到还没稳定的布局,会缩过头。
+     下一帧再校一次,拿到的就是最终布局。 */
+  if (window.requestAnimationFrame) requestAnimationFrame(run);
 }
 /* 抽奖结束的总榜:全部中奖者按奖项分组,名字横排铺开 */
 function renderFinalBoard(){
@@ -1045,6 +1081,7 @@ function startRoll(){
   var rank = tierRank(t.id);
   S.frame = null; S.shown = null; S.revealing = false;
   S.rolling = true;
+  setFocus(true);
   S.rank = rank;
   soundRollStart(rank);
 
@@ -1169,6 +1206,7 @@ function stopRoll(){
     }
     eyebrow(main, sub);
     S.revealing = false;
+    setFocus(false);
     renderRail();
   }, HUSH + picked.length * STEP + 300);
 }
@@ -1624,10 +1662,28 @@ function restoreProgress(f){
 
 /* ---------- wiring ---------- */
 $('#bPour').onclick = function(){ S.rolling ? stopRoll() : startRoll(); };
-$('#bUndo').onclick = undo;
+/* 撤销和重置都会改动已经开出来的结果,现场手一滑代价很大,都要二次确认。
+   确认框里写清楚具体撤掉谁、影响多少人,而不是一句笼统的「确定吗」。 */
+$('#bUndo').onclick = function(){
+  var last = S.history[S.history.length - 1];
+  if (!last) return;
+  var t = tierById(last.tierId);
+  var names = last.people.map(function(p){
+    return p.name + (p.sub ? '(' + p.sub + ')' : '');
+  }).join('\n');
+  if (!confirm(
+    'ยกเลิกรอบล่าสุด?  撤销上一轮?\n\n' +
+    (t ? t.th + ' · ' + t.zh + '\n' : '') +
+    '这 ' + last.people.length + ' 位的中奖资格会被取消:\n' + names +
+    '\n\n他们会回到待抽池,可以重新抽。')) return;
+  undo();
+};
 $('#bReset').onclick = function(){
   if (!S.winners.length && !S.pool.length) return;
-  if (!confirm('รีเซ็ตผลทั้งหมด? 清空所有中奖结果并把人放回奖池?')) return;
+  if (!confirm(
+    'รีเซ็ตทั้งหมด?  重置全部?\n\n' +
+    '已中奖的 ' + S.winners.length + ' 位会全部作废,和剩下的 ' + S.pool.length +
+    ' 位一起回到待抽池,重新开始。\n名单和奖项设置保留。\n\n这一步无法撤销。')) return;
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   syncActive();
@@ -1738,11 +1794,18 @@ document.addEventListener('keydown', function(e){
   }
   if (e.key === 'f' || e.key === 'F'){ $('#bFull').click(); }
 });
+/* 转屏、地址栏收起、拖动窗口都会连续触发 resize。防抖 150ms 再重排:
+   一来不用反复重建 DOM,二来中途的布局是不稳定的,量出来的高度会偏小,
+   总榜会被缩得过小。 */
+var resizeTimer = null;
 window.addEventListener('resize', function(){
-  if (S.rolling || S.revealing) return;      // 正在转 / 正在逐个揭晓,别插手
-  if (allDone()){ renderFinalBoard(); return; }   // 总榜:按新尺寸重排并重新缩放
-  if (renderShown()) return;                 // 已揭晓的那一屏:按新尺寸重画,不清空
-  resetStage();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){
+    if (S.rolling || S.revealing) return;         // 正在转 / 正在逐个揭晓,别插手
+    if (allDone()){ renderFinalBoard(); return; } // 总榜:按新尺寸重排并重新缩放
+    if (renderShown()) return;                    // 已揭晓的那一屏:重画,不清空
+    resetStage();
+  }, 150);
 });
 
 $('#autoSave').checked = autoOn;

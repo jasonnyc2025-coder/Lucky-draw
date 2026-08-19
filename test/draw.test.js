@@ -11,7 +11,15 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, acceptDownloads: true });
   const page = await ctx.newPage();
   const errs = [];
-  page.on('pageerror', e => errs.push(e.message));
+  page.on('pageerror', e => errs.push((e.stack || e.message).split('\n').slice(0, 3).join(' ← ')));
+
+  // 撤销和重置都有确认框。默认点「确定」,测试取消行为时临时切成 dismiss。
+  let dialogAction = 'accept';
+  const dialogs = [];
+  page.on('dialog', d => {
+    dialogs.push(d.message());
+    if (dialogAction === 'accept') d.accept(); else d.dismiss();
+  });
 
   async function closeVeil(id) {
     // 有些操作会让应用自己关掉面板,这里要容错
@@ -88,14 +96,34 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
                locked: document.querySelectorAll('#rail .tier')[2].classList.contains('locked') };
     });
     R.check('未抽完时后面的奖项锁住', lock.locked && lock.same);
+    // 回归:提示语要真的弹出来。曾经因为 renderRail 里 var cur 被同名变量覆盖,
+    // 点锁住的奖项时直接报错、什么都不提示。
+    R.check('点锁住的奖项会提示先抽完前一档',
+            /请按顺序|先抽完/.test(await page.evaluate(() =>
+              document.querySelector('#toast').textContent)),
+            await page.evaluate(() => document.querySelector('#toast').textContent));
 
     // ---------- 4. 依次开奖 ----------
+    const chrome = () => page.evaluate(() => {
+      const on = el => !!(el && el.offsetParent !== null);
+      return {
+        focus: document.querySelector('.app').classList.contains('focus'),
+        topbar: on(document.querySelector('.topbar')),
+        rail: on(document.querySelector('.rail')),
+        reset: on(document.querySelector('#bReset')),
+        pour: on(document.querySelector('#bPour')),
+      };
+    });
+    let focusRolling = null, focusAfter = null;
+
     async function drawRound(picks) {
       await page.click('#bPour');
       await page.waitForTimeout(1400);
       if (!await page.evaluate(() => S.rolling)) throw new Error('没有进入 rolling 状态');
+      if (!focusRolling) focusRolling = await chrome();      // 滚动中的界面状态
       await page.click('#bPour');
       await page.waitForTimeout(900 + picks * 650 + 900);      // 等揭晓动画走完
+      if (!focusAfter) focusAfter = await chrome();
     }
     // ---------- 3.5 所见即所得 ----------
     // 在同一个 evaluate 里读屏幕再停止,中间不可能插进一帧,断言是确定的
@@ -163,6 +191,15 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     R.check('剩余 = 60 - 14', st.pool === 46 && st.remain === 46 && st.total === 60,
             st.pool + ' / ' + st.remain + ' / ' + st.total);
     R.check('全部抽完提示', /全部抽奖完成/.test(st.eyebrow), st.eyebrow);
+
+    R.check('滚动时收起顶栏和奖项列表,只留舞台和停止键',
+            focusRolling && focusRolling.focus && !focusRolling.topbar &&
+            !focusRolling.rail && !focusRolling.reset && focusRolling.pour,
+            JSON.stringify(focusRolling));
+    R.check('揭晓结束后界面恢复',
+            focusAfter && !focusAfter.focus && focusAfter.topbar &&
+            focusAfter.rail && focusAfter.reset,
+            JSON.stringify(focusAfter));
 
     // ---------- 4.5 结束总榜 ----------
     await page.waitForTimeout(3000);          // 最后一位在台上停 2.6 秒后切总榜
@@ -243,16 +280,40 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             `pool=${prog.pool.length} winners=${prog.winners.length} tiers=${prog.tiers.length}`);
     await closeVeil('#vSetup');
 
-    // ---------- 8. 撤销 ----------
-    const undo = await page.evaluate(() => {
-      const b = { w: S.winners.length, p: S.pool.length };
-      document.querySelector('#bUndo').click();
-      return { b, a: { w: S.winners.length, p: S.pool.length } };
-    });
-    R.check('撤销上一轮', undo.a.w === undo.b.w - 1 && undo.a.p === undo.b.p + 1, JSON.stringify(undo));
+    // ---------- 8. 撤销(带确认框) ----------
+    const before = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
 
-    // ---------- 9. 重置 ----------
-    page.on('dialog', d => d.accept());
+    dialogAction = 'dismiss';
+    dialogs.length = 0;
+    await page.click('#bUndo');
+    await page.waitForTimeout(300);
+    const cancelled = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
+    R.check('撤销会弹确认框', dialogs.length === 1, dialogs[0] && dialogs[0].split('\n')[0]);
+    R.check('确认框里写清楚要撤谁',
+            !!dialogs[0] && /撤销上一轮/.test(dialogs[0]) && /中奖资格会被取消/.test(dialogs[0]),
+            dialogs[0] && dialogs[0].replace(/\n/g, ' | '));
+    R.check('点取消什么都不变',
+            cancelled.w === before.w && cancelled.p === before.p, JSON.stringify(cancelled));
+
+    dialogAction = 'accept';
+    await page.click('#bUndo');
+    await page.waitForTimeout(300);
+    const undone = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
+    R.check('点确定才真的撤销',
+            undone.w === before.w - 1 && undone.p === before.p + 1,
+            JSON.stringify(before) + ' → ' + JSON.stringify(undone));
+
+    // ---------- 9. 重置(带确认框) ----------
+    dialogAction = 'dismiss';
+    dialogs.length = 0;
+    await page.click('#bReset');
+    await page.waitForTimeout(300);
+    const notReset = await page.evaluate(() => S.winners.length);
+    R.check('重置会弹确认框且点取消不生效',
+            dialogs.length === 1 && notReset === undone.w,
+            (dialogs[0] || '').split('\n')[0] + ' / winners=' + notReset);
+
+    dialogAction = 'accept';
     await page.click('#bReset');
     await page.waitForTimeout(500);
     const reset = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
@@ -292,6 +353,41 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     const pasted = await page.evaluate(() => ({ p: S.pool.length, first: S.pool[0], w: S.winners.length }));
     R.check('粘贴导入 3 人并清空旧结果',
             pasted.p === 3 && pasted.first.sub === 'T001' && pasted.w === 0, JSON.stringify(pasted));
+
+    // ---------- 13. 换档后奖项列表要滚到当前这一档 ----------
+    // 手机上奖项列表是一条横向滚动带,一屏只看得到一两档
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.waitForTimeout(400);
+    const railView = await page.evaluate(() => {
+      S.pool = Array.from({ length: 20 }, (_, i) => ({ name: 'P' + i, sub: 'E' + i }));
+      S.winners = []; S.history = [];
+      S.tiers.forEach(t => { t.quota = 1; t.per = 1; });
+      // 第一档抽完,当前应切到第二档
+      S.winners.push({ tierId: S.tiers[0].id, name: 'P0', sub: 'E0' });
+      syncActive(); renderRail();
+      const rail = document.querySelector('.rail');
+      const on = rail.querySelector('.tier.on');
+      const r = rail.getBoundingClientRect(), o = on.getBoundingClientRect();
+      return {
+        active: (S.tiers.find(t => t.id === S.activeTier) || {}).zh,
+        onText: on.innerText.replace(/\s+/g, ' ').trim().slice(0, 18),
+        visible: o.left >= r.left - 2 && o.right <= r.right + 2,
+        scrollLeft: Math.round(rail.scrollLeft),
+      };
+    });
+    await page.waitForTimeout(600);           // 平滑滚动走完
+    const railAfter = await page.evaluate(() => {
+      const rail = document.querySelector('.rail');
+      const on = rail.querySelector('.tier.on');
+      const r = rail.getBoundingClientRect(), o = on.getBoundingClientRect();
+      return { visible: o.left >= r.left - 2 && o.right <= r.right + 2,
+               scrollLeft: Math.round(rail.scrollLeft) };
+    });
+    R.check('换到下一档时,奖项列表自动滚到当前这一档',
+            railView.active === '二等奖' && railAfter.visible,
+            railView.onText + ' · scrollLeft ' + railView.scrollLeft + '→' + railAfter.scrollLeft);
+    await page.setViewportSize({ width: 1280, height: 860 });
+    await page.waitForTimeout(300);
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
