@@ -467,7 +467,21 @@ td input{padding:9px 10px;font-size:15px}
           <span class="hint" style="margin:0" id="progNote"></span>
         </div>
         <p class="hint">保存后会下载一个 .json,里面包含名单、奖项、已中奖名单和 Logo。<br>
-        中途断电或误关页面,重新打开这个网页再「恢复进度」即可接着抽。建议每抽完一档存一次。</p>
+        日常误关页面不用管它 —— 下面的「本机存档」会自动接着上次继续。<br>
+        这个文件是用来<b style="color:var(--pour)">换设备</b>(换台电脑接投影)和<b style="color:var(--pour)">留备份</b>的。
+        正式场合建议每抽完一档导出一次,万一这台机器出问题,换一台「恢复进度」照样接着抽。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">ข้อมูลในเครื่อง · 本机存档</div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="autoSave" checked> บันทึกอัตโนมัติ · 自动保存到本机</label>
+          <button class="ghost" id="bClearStore" style="margin-left:auto">ลบข้อมูลในเครื่อง 清除本机数据</button>
+        </div>
+        <p class="hint" style="margin-top:12px" id="storeNote">…</p>
+        <p class="hint">名单、Logo、奖项设置、已中奖名单会自动存在这台设备的浏览器里。<b style="color:var(--pour)">误关页面、断电、手机杀后台,重新打开会自动接着上次继续</b>,不用手动恢复。<br>
+        数据只在本机,不上传任何地方。换设备或换浏览器不会同步 —— 那种情况用上面的「保存进度」导出 .json 带走。<br>
+        「清除本机数据」会连同名单和 Logo 一起删掉,无法撤销。</p>
       </div>
 
       <div class="sec">
@@ -913,6 +927,7 @@ function stopRoll(){
     S.winners.push({tierId:t.id, name:p.name, sub:p.sub});
   });
   S.history.push({tierId:t.id, people:picked});
+  autosave();
 
   var cards = slots.querySelectorAll('.ingot');
   var sz = sizeFor(n);
@@ -974,7 +989,7 @@ function undo(){
     }
   });
   syncActive();
-  renderRail(); resetStage();
+  renderRail(); resetStage(); autosave();
   toast('ยกเลิกแล้ว · 已撤销 ' + last.people.length + ' 人');
 }
 
@@ -984,6 +999,7 @@ function setPool(list){
   S.winners = []; S.history = [];
   syncActive();
   renderRail(); resetStage();
+  autosave();
   $('#poolNote').textContent = list.length + ' 人已载入';
   toast('นำเข้าแล้ว · 已导入 ' + list.length + ' 人');
 }
@@ -1147,6 +1163,110 @@ function applyLogo(dataUrl){
     img.removeAttribute('src'); img.classList.remove('on');
     prev.removeAttribute('src'); prev.classList.remove('on');
   }
+  autosave();
+}
+
+/* ---------- 本机自动存档 (IndexedDB) ---------- */
+var STORE_PREF = 'lucky-draw.autosave';     // 开关本身存 localStorage,清库也不丢
+var DB = (function(){
+  var NAME = 'lucky-draw', STORE = 'state', KEY = 'current';
+  var supported = false, dbp = null;
+  try { supported = !!window.indexedDB; } catch(e){ supported = false; }
+
+  function open(){
+    if (dbp) return dbp;
+    dbp = new Promise(function(res, rej){
+      var rq = indexedDB.open(NAME, 1);
+      rq.onupgradeneeded = function(){ rq.result.createObjectStore(STORE); };
+      rq.onsuccess = function(){ res(rq.result); };
+      rq.onerror   = function(){ rej(rq.error); };
+      rq.onblocked = function(){ rej(new Error('blocked')); };
+    });
+    return dbp;
+  }
+  function run(mode, fn){
+    if (!supported) return Promise.reject(new Error('no-idb'));
+    return open().then(function(db){
+      return new Promise(function(res, rej){
+        var t = db.transaction(STORE, mode), rq = fn(t.objectStore(STORE));
+        t.oncomplete = function(){ res(rq ? rq.result : undefined); };
+        t.onerror    = function(){ rej(t.error); };
+        t.onabort    = function(){ rej(t.error || new Error('abort')); };
+      });
+    });
+  }
+  return {
+    supported: supported,
+    get: function(){ return run('readonly',  function(st){ return st.get(KEY); }); },
+    put: function(v){ return run('readwrite', function(st){ return st.put(v, KEY); }); },
+    del: function(){ return run('readwrite', function(st){ return st['delete'](KEY); }); }
+  };
+})();
+
+var autoOn = true, saveTimer = null, restoring = false;
+try { autoOn = localStorage.getItem(STORE_PREF) !== 'off'; } catch(e){}
+
+function two(n){ return String(n).padStart(2, '0'); }
+function storeNote(txt){ var n = $('#storeNote'); if (n) n.textContent = txt; }
+
+function snapshot(){
+  return {
+    app:'lucky-draw', v:1, savedAt:new Date().toISOString(),
+    tiers:S.tiers, pool:S.pool, winners:S.winners, history:S.history,
+    activeTier:S.activeTier, logo:S.logo || '',
+    snd:{ on:A.on, vol:A.vol }
+  };
+}
+/* 任何一处状态变了就调它。防抖 400ms,连续开奖不会写爆磁盘。 */
+function autosave(){
+  if (!autoOn || restoring || !DB.supported) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    DB.put(snapshot()).then(function(){
+      var d = new Date();
+      storeNote('已自动保存 · ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +
+                ' · ' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖');
+    }).catch(function(){
+      storeNote('บันทึกอัตโนมัติไม่สำเร็จ · 自动保存失败,请用「保存进度」导出文件');
+    });
+  }, 400);
+}
+/* 开机恢复。IndexedDB 是异步的,先把空界面画出来,读到了再重画。 */
+function bootRestore(){
+  if (!DB.supported){ storeNote('เบราว์เซอร์นี้เก็บไม่ได้ · 此浏览器不支持本机存档,请用「保存进度」'); return; }
+  DB.get().then(function(d){
+    if (!d || !Array.isArray(d.tiers) || !Array.isArray(d.pool)){
+      storeNote('ยังไม่มีข้อมูลในเครื่อง · 本机还没有存档');
+      return;
+    }
+    restoring = true;
+    S.tiers   = d.tiers;
+    S.pool    = d.pool;
+    S.winners = d.winners || [];
+    S.history = d.history || [];
+    uid = Math.max.apply(null, S.tiers.map(function(t){ return t.id || 0; }).concat([0]));
+    if (d.snd){
+      A.on = d.snd.on !== false;
+      A.vol = typeof d.snd.vol === 'number' ? d.snd.vol : A.vol;
+      $('#sndOn').checked = A.on;
+      $('#sndVol').value = Math.round(A.vol * 100);
+      syncSoundBtn();
+    }
+    syncActive();
+    applyLogo(d.logo || '');
+    renderRail(); resetStage();
+    restoring = false;
+    var t = new Date(d.savedAt || Date.now());
+    storeNote('已从本机恢复 · 存于 ' + two(t.getHours()) + ':' + two(t.getMinutes()) +
+              ' · ' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖');
+    if (S.pool.length || S.winners.length){
+      toast('กู้คืนจากเครื่องแล้ว · 已恢复上次的数据 ' +
+            S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖');
+    }
+  }).catch(function(){
+    restoring = false;
+    storeNote('อ่านข้อมูลในเครื่องไม่ได้ · 读取本机存档失败');
+  });
 }
 
 /* ---------- progress save / restore ---------- */
@@ -1183,6 +1303,7 @@ function restoreProgress(f){
       syncActive();
       applyLogo(d.logo || '');
       renderRail(); resetStage();
+      autosave();
       $('#progNote').textContent = '已恢复 · ' + S.winners.length + ' 中奖 / ' + S.pool.length + ' 待抽';
       $('#vSetup').classList.remove('on');
       toast('กู้คืนแล้ว · 进度已恢复');
@@ -1200,7 +1321,7 @@ $('#bReset').onclick = function(){
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   syncActive();
-  renderRail(); resetStage(); toast('รีเซ็ตแล้ว · 已重置');
+  renderRail(); resetStage(); autosave(); toast('รีเซ็ตแล้ว · 已重置');
 };
 $('#bFull').onclick = function(){
   if (document.fullscreenElement) document.exitFullscreen();
@@ -1249,7 +1370,7 @@ $('#bSaveTiers').onclick = function(){
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   syncActive();
-  renderRail(); resetStage();
+  renderRail(); resetStage(); autosave();
   $('#vTiers').classList.remove('on');
   toast('บันทึกแล้ว · 已保存');
 };
@@ -1278,16 +1399,17 @@ $('#bSound').onclick = function(){
   A.on = !A.on;
   $('#sndOn').checked = A.on;
   if (!A.on) soundRollStop(); else audioReady();
-  syncSoundBtn();
+  syncSoundBtn(); autosave();
 };
 $('#sndOn').onchange = function(){
   A.on = this.checked;
   if (!A.on) soundRollStop(); else audioReady();
-  syncSoundBtn();
+  syncSoundBtn(); autosave();
 };
 $('#sndVol').oninput = function(){
   A.vol = +this.value / 100;
   if (A.master) A.master.gain.value = A.vol;
+  autosave();
 };
 $('#bTestSnd').onclick = function(){
   if (!A.on){ toast('เสียงปิดอยู่ · 音效已关闭'); return; }
@@ -1308,9 +1430,37 @@ document.addEventListener('keydown', function(e){
 });
 window.addEventListener('resize', function(){ if (!S.rolling) resetStage(); });
 
+$('#autoSave').checked = autoOn;
+$('#autoSave').onchange = function(){
+  autoOn = this.checked;
+  try { localStorage.setItem(STORE_PREF, autoOn ? 'on' : 'off'); } catch(e){}
+  if (autoOn){ autosave(); toast('เปิดบันทึกอัตโนมัติ · 已开启自动保存'); }
+  else {
+    clearTimeout(saveTimer);
+    storeNote('บันทึกอัตโนมัติปิดอยู่ · 自动保存已关闭,现有存档仍在,可点右边删除');
+    toast('ปิดบันทึกอัตโนมัติ · 已关闭自动保存');
+  }
+};
+$('#bClearStore').onclick = function(){
+  if (!confirm('ลบข้อมูลในเครื่องทั้งหมด? 清除本机存档,连同名单、Logo、已中奖名单一起删掉,无法撤销。继续?')) return;
+  clearTimeout(saveTimer);
+  restoring = true;                       // 清完别立刻又写回去
+  DB.del().catch(function(){}).then(function(){
+    S.pool = []; S.winners = []; S.history = [];
+    S.tiers = defaultTiers();
+    applyLogo('');
+    syncActive();
+    renderRail(); resetStage();
+    restoring = false;
+    storeNote('ลบแล้ว · 本机存档已清除');
+    toast('ลบข้อมูลในเครื่องแล้ว · 本机数据已清除');
+  });
+};
+
 syncActive();
 renderRail();
 resetStage();
+bootRestore();
 
 /* ---------- PWA: install + offline + update ---------- */
 (function(){
