@@ -9,12 +9,14 @@ const http = require('http');
 
 const ROOT = path.join(__dirname, '..', '..');
 const CDN_XLSX = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const CDN_PDF  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const CDN_PDFW = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /* 页面从 cdnjs 加载 xlsx。测试环境未必能出网,装了 devDependency 就换成本地那份,
    保证 Excel 导入这条路径每次都测得到。 */
-function localXlsx() {
+function localFile(spec) {
   try {
-    return require.resolve('xlsx/dist/xlsx.full.min.js', { paths: [ROOT] });
+    return require.resolve(spec, { paths: [ROOT] });
   } catch (e) {
     return null;
   }
@@ -30,15 +32,23 @@ function buildHarness() {
     fs.copyFileSync(src, path.join(dir, f));
   }
 
-  let usedLocalXlsx = false;
-  const lib = localXlsx();
-  if (lib) {
-    fs.copyFileSync(lib, path.join(dir, 'xlsx.full.min.js'));
-    const idx = path.join(dir, 'index.html');
-    fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').split(CDN_XLSX).join('./xlsx.full.min.js'));
-    usedLocalXlsx = true;
-  }
-  return { dir, usedLocalXlsx };
+  const idx = path.join(dir, 'index.html');
+  let html = fs.readFileSync(idx, 'utf8');
+
+  // 页面正常从 cdnjs 取这两个库。测试环境未必能出网,装了依赖就换成本地那份。
+  const swap = (spec, out, url) => {
+    const lib = localFile(spec);
+    if (!lib) return false;
+    fs.copyFileSync(lib, path.join(dir, out));
+    html = html.split(url).join('./' + out);
+    return true;
+  };
+  const usedLocalXlsx = swap('xlsx/dist/xlsx.full.min.js', 'xlsx.full.min.js', CDN_XLSX);
+  const usedLocalPdf  = swap('pdfjs-dist/build/pdf.min.js', 'pdf.min.js', CDN_PDF) &&
+                        swap('pdfjs-dist/build/pdf.worker.min.js', 'pdf.worker.min.js', CDN_PDFW);
+
+  fs.writeFileSync(idx, html);
+  return { dir, usedLocalXlsx, usedLocalPdf };
 }
 
 const MIME = {
@@ -73,14 +83,8 @@ function startServer(dir) {
   });
 }
 
-/** 生成 60 人的测试名单(泰/中/英各 20),三列:姓名、工号、部门。 */
-function makeStaffXlsx(dir) {
-  let XLSX;
-  try {
-    XLSX = require(require.resolve('xlsx', { paths: [ROOT] }));
-  } catch (e) {
-    return null;
-  }
+/** 60 人的测试名单(泰/中/英各 20),三列:姓名、工号、部门。 */
+function staffRows() {
   const th = ['สมชาย ใจดี', 'กมลรัตน์ ศรีสุข', 'ธนวัฒน์ พงษ์ไทย', 'ณัฐพล ทองดี', 'ปิยะนุช แก้วมณี',
               'อรทัย บุญมา', 'วิชัย รักชาติ', 'สุดารัตน์ จันทร์เพ็ญ', 'ภาณุพงศ์ เกษมสุข', 'นภาพร ดวงแก้ว'];
   const zh = ['李伟', '王芳', '张敏', '刘洋', '陈静', '杨帆', '赵磊', '黄丽', '周杰', '吴倩'];
@@ -97,10 +101,61 @@ function makeStaffXlsx(dir) {
       }
     }
   }
+  return rows;
+}
+
+/** 把上面的名单写成 .xlsx。 */
+function makeStaffXlsx(dir) {
+  let XLSX;
+  try {
+    XLSX = require(require.resolve('xlsx', { paths: [ROOT] }));
+  } catch (e) {
+    return null;
+  }
+  const rows = staffRows();
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Staff');
   const file = path.join(dir, 'staff.xlsx');
   XLSX.writeFile(wb, file);
+  return file;
+}
+
+/** 用无头浏览器把一张 HTML 表格打印成真正的文字版 PDF(60 人,三列)。 */
+async function makeStaffPdf(dir) {
+  const rows = staffRows();
+  /* 容器里通常没装泰文字体,不嵌一个的话打印出来的 PDF 里泰文声调符号会整个丢掉,
+     测出来的就不是解析器的问题而是环境的问题。 */
+  const thai = localFile('@fontsource/noto-sans-thai/files/noto-sans-thai-thai-400-normal.woff');
+  const face = thai
+    ? `@font-face{font-family:NT;src:url(data:font/woff;base64,${fs.readFileSync(thai).toString('base64')}) format('woff')}`
+    : '';
+  const html = `<style>
+      ${face}
+      body{font:14px ${thai ? 'NT,' : ''}"DejaVu Sans",sans-serif;padding:24px}
+      table{border-collapse:collapse;width:100%}
+      td,th{padding:5px 10px;text-align:left}
+      th{font-weight:700}
+    </style>
+    <table><thead><tr>${rows[0].map(c => '<th>' + c + '</th>').join('')}</tr></thead>
+    <tbody>${rows.slice(1).map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')}</tbody>
+    </table>`;
+  const b = await chromium().launch();
+  const p = await b.newPage();
+  await p.setContent(html, { waitUntil: 'load' });
+  const file = path.join(dir, 'staff.pdf');
+  await p.pdf({ path: file, format: 'A4', printBackground: true });
+  await b.close();
+  return file;
+}
+
+/** 一张没有任何文字的 PDF(模拟扫描件),用来验证错误提示。 */
+async function makeBlankPdf(dir) {
+  const b = await chromium().launch();
+  const p = await b.newPage();
+  await p.setContent('<div style="width:200px;height:200px;background:#ccc"></div>', { waitUntil: 'load' });
+  const file = path.join(dir, 'blank.pdf');
+  await p.pdf({ path: file, format: 'A4', printBackground: true });
+  await b.close();
   return file;
 }
 
@@ -130,4 +185,5 @@ function chromium() {
   return require('playwright').chromium;
 }
 
-module.exports = { ROOT, buildHarness, startServer, makeStaffXlsx, reporter, chromium };
+module.exports = { ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,
+                   staffRows, reporter, chromium };

@@ -103,7 +103,9 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       startRoll();
       await new Promise(r => setTimeout(r, 1200));
       const onScreen = [...document.querySelectorAll('#slots .nm')].map(n => n.textContent);
-      const frame = S.frame.map(p => p.name);
+      // 测试名单里同一个姓名会出现两次(工号不同,是两个不同的人),
+      // 所以这里比的是「人」而不是「名字」
+      const frame = S.frame.map(p => p.name + '|' + p.sub);
       const n = S.winners.length;
       stopRoll();
       return { onScreen, frame, picked: S.winners.slice(n).map(w => w.name) };
@@ -112,7 +114,8 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             JSON.stringify(wysiwyg.onScreen) === JSON.stringify(wysiwyg.picked),
             wysiwyg.onScreen.join(',') + ' → ' + wysiwyg.picked.join(','));
     R.check('滚动时同一帧不出现重复的人',
-            new Set(wysiwyg.frame).size === wysiwyg.frame.length, wysiwyg.frame.join(','));
+            new Set(wysiwyg.frame).size === wysiwyg.frame.length,
+            wysiwyg.frame.join(' , '));
     await page.waitForTimeout(4500);
     await page.evaluate(() => { document.querySelector('#bUndo').click(); });
     await page.waitForTimeout(300);

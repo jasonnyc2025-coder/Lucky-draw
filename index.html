@@ -421,8 +421,9 @@ td input{padding:9px 10px;font-size:15px}
       <div class="sec">
         <div class="sec-h">นำเข้าไฟล์ · 导入文件</div>
         <div class="drop" id="drop">
-          <label class="filepick">เลือกไฟล์ 选择文件<input type="file" id="file" accept=".csv,.xlsx,.xls,.txt" hidden></label>
-          <p>Excel (.xlsx / .xls) · CSV · ลากไฟล์มาวางได้ 可拖拽</p>
+          <label class="filepick">เลือกไฟล์ 选择文件<input type="file" id="file" accept=".csv,.xlsx,.xls,.txt,.pdf" hidden></label>
+          <p>Excel (.xlsx / .xls) · CSV · PDF · ลากไฟล์มาวางได้ 可拖拽</p>
+          <p class="hint" style="margin-top:6px">PDF 只能读出文字版的内容;扫描件、拍照转的 PDF 里没有文字,读不出来。</p>
         </div>
         <div id="mapWrap" style="display:none;margin-top:16px">
           <div class="row">
@@ -568,7 +569,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v10';
+var APP_VERSION = 'v11';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -591,6 +592,7 @@ var S = {
   rolling: false,
   timer: null,
   fileRows: null,
+  fromPdf: false,
   logo: '',
   frame: null,       // 滚动时屏幕上正显示的这一组人 —— 按下停止就是他们中奖
   shown: null,       // 当前屏上已揭晓的人,resize 时用来重画而不是清空
@@ -1220,7 +1222,10 @@ function previewMap(){
   var sample = S.fileRows.slice(start, start + 3).map(function(r){
     return String(r[ni] == null ? '' : r[ni]).trim() + (si >= 0 && r[si] != null && String(r[si]).trim() ? ' (' + String(r[si]).trim() + ')' : '');
   }).filter(Boolean);
-  $('#mapPreview').textContent = '共 ' + Math.max(0, S.fileRows.length - start) + ' 行 · 预览: ' + sample.join(' / ');
+  $('#mapPreview').innerHTML = '共 ' + Math.max(0, S.fileRows.length - start) + ' 行 · 预览: ' +
+    sample.join(' / ').replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) +
+    (S.fromPdf ? '<br><b style="color:var(--pour)">PDF 提取的文字可能缺字(泰文声调符号尤其容易丢),' +
+                 '请仔细核对上面的预览再确认。名单重要的话建议用 Excel 或 CSV。</b>' : '');
 }
 function applyFile(){
   if (!S.fileRows) return;
@@ -1237,13 +1242,113 @@ function applyFile(){
   setPool(list);
   $('#vNames').classList.remove('on');
 }
+/* ---------- PDF ---------- */
+/* 用到才加载。这个库一兆多,不该让每次打开都等它。 */
+var PDFJS_SRC    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var pdfjsP = null;
+function loadPdfJs(){
+  if (pdfjsP) return pdfjsP;
+  pdfjsP = new Promise(function(res, rej){
+    if (window.pdfjsLib){ res(window.pdfjsLib); return; }
+    var sc = document.createElement('script');
+    sc.src = PDFJS_SRC;
+    sc.onload = function(){
+      if (!window.pdfjsLib){ pdfjsP = null; rej(new Error('no lib')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      res(window.pdfjsLib);
+    };
+    sc.onerror = function(){ pdfjsP = null; rej(new Error('load failed')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsP;
+}
+
+/* PDF 里没有表格,只有一堆带坐标的文字块。
+   先按 y 归行(PDF 原点在左下,y 大的在上面),再按 x 方向的间隙切列,
+   还原成和 Excel 一样的二维表,后面就能复用同一套列选择界面。 */
+function pdfRows(items){
+  var byY = {}, lines = [];
+  items.forEach(function(it){
+    if (!it.str || !it.str.trim()) return;
+    var x = it.transform[4], y = it.transform[5];
+    var h = Math.abs(it.transform[3]) || Math.abs(it.height) || 10;
+    var k = Math.round(y), line = null;
+    /* 同一行的 y 会有零点几的抖动,左右各看一格 */
+    for (var d = -1; d <= 1 && !line; d++) line = byY[k + d];
+    if (!line){ line = { y:y, items:[] }; byY[k] = line; lines.push(line); }
+    line.items.push({ x:x, w:it.width || 0, s:it.str, h:h });
+  });
+
+  lines.sort(function(a, b){ return b.y - a.y; });
+
+  return lines.map(function(line){
+    line.items.sort(function(a, b){ return a.x - b.x; });
+    var cells = [], cell = '', prevEnd = null;
+    line.items.forEach(function(t){
+      if (prevEnd !== null){
+        var gap = t.x - prevEnd;
+        if (gap > Math.max(6, t.h * 0.9)) { cells.push(cell); cell = ''; }   // 列间距 → 换列
+        else if (gap > t.h * 0.12) cell += ' ';                              // 词间距 → 加空格
+      }
+      cell += t.s;
+      prevEnd = t.x + t.w;
+    });
+    cells.push(cell);
+    /* PDF 里会混进 NUL 之类的控制字符(字体的 ToUnicode 表不全时) */
+    return cells.map(function(c){
+      return c.replace(/[\u0000-\u001F\u007F]/g, '').replace(/\s+/g, ' ').trim();
+    });
+  }).filter(function(r){ return r.some(function(c){ return c; }); });
+}
+
+/* 多页 PDF 每页都会重复表头,把后面那些一模一样的行去掉 */
+function dropRepeatHeaders(rows){
+  if (rows.length < 2) return rows;
+  var head = JSON.stringify(rows[0]);
+  return rows.filter(function(r, i){ return i === 0 || JSON.stringify(r) !== head; });
+}
+
+function readPdf(buf){
+  toast('กำลังอ่าน PDF · 正在读取 PDF…');
+  loadPdfJs().then(function(lib){
+    return lib.getDocument({ data: new Uint8Array(buf) }).promise;
+  }).then(function(doc){
+    var jobs = [];
+    for (var i = 1; i <= doc.numPages; i++){
+      jobs.push(doc.getPage(i).then(function(pg){ return pg.getTextContent(); }));
+    }
+    return Promise.all(jobs);
+  }).then(function(pages){
+    var rows = [];
+    pages.forEach(function(tc){ rows = rows.concat(pdfRows(tc.items)); });
+    rows = dropRepeatHeaders(rows);
+    if (!rows.length){
+      toast('PDF ไม่มีข้อความ · 这个 PDF 里没有文字(可能是扫描件),请改用 Excel 或 CSV');
+      return;
+    }
+    S.fromPdf = true;
+    loadRows(rows);
+  }).catch(function(err){
+    if (String(err && err.message) === 'load failed' || !window.pdfjsLib){
+      toast('โหลดตัวอ่าน PDF ไม่ได้ · PDF 组件加载失败,需联网打开一次,或改用 Excel / CSV');
+    } else {
+      toast('อ่าน PDF ไม่ได้ · PDF 读取失败,请改用 Excel 或 CSV');
+    }
+  });
+}
+
 function handleFile(f){
   if (!f) return;
   var isExcel = /\.(xlsx|xls)$/i.test(f.name);
+  var isPdf   = /\.pdf$/i.test(f.name);
   var reader = new FileReader();
   reader.onload = function(e){
     try{
-      if (isExcel){
+      S.fromPdf = false;
+      if (isPdf){
+        readPdf(e.target.result);
+      } else if (isExcel){
         if (typeof XLSX === 'undefined'){
           toast('โหลด Excel ไม่ได้ · Excel 组件未加载,请改用 CSV'); return;
         }
@@ -1255,7 +1360,7 @@ function handleFile(f){
       }
     } catch(err){ toast('อ่านไฟล์ไม่ได้ · 文件读取失败'); }
   };
-  if (isExcel) reader.readAsArrayBuffer(f); else reader.readAsText(f, 'UTF-8');
+  if (isExcel || isPdf) reader.readAsArrayBuffer(f); else reader.readAsText(f, 'UTF-8');
 }
 
 /* ---------- tiers editor ---------- */

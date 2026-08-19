@@ -1,6 +1,6 @@
 /* จับรางวัล · 抽奖 — service worker
    改动这个文件时把 VERSION 加一,用户下次打开会收到更新提示。 */
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CORE = 'draw-core-' + VERSION;
 const RUNTIME = 'draw-runtime-' + VERSION;
 

@@ -6,9 +6,12 @@
   "scripts": {
     "test": "node test/run.js",
     "test:draw": "node test/run.js draw",
+    "test:pdf": "node test/run.js pdf",
     "test:storage": "node test/run.js storage"
   },
   "devDependencies": {
+    "@fontsource/noto-sans-thai": "^5.3.0",
+    "pdfjs-dist": "3.11.174",
     "playwright": "1.56.1",
     "xlsx": "^0.18.5"
   }

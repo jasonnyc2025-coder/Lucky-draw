@@ -4,10 +4,11 @@
 'use strict';
 
 const fs = require('fs');
-const { buildHarness, startServer, makeStaffXlsx } = require('./lib/harness');
+const { buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf } = require('./lib/harness');
 
 const SUITES = {
   draw: require('./draw.test.js'),
+  pdf: require('./pdf.test.js'),
   storage: require('./storage.test.js'),
 };
 
@@ -21,14 +22,19 @@ const SUITES = {
     }
   }
 
-  const { dir, usedLocalXlsx } = buildHarness();
+  const { dir, usedLocalXlsx, usedLocalPdf } = buildHarness();
   const staffXlsx = makeStaffXlsx(dir);
+  const needPdf = names.includes('pdf');
+  const staffPdf = needPdf ? await makeStaffPdf(dir) : null;
+  const blankPdf = needPdf ? await makeBlankPdf(dir) : null;
   const server = await startServer(dir);
 
   console.log('临时副本 : ' + dir);
   console.log('服务地址 : ' + server.url);
   console.log('xlsx     : ' + (usedLocalXlsx ? '本地 node_modules(离线也能测 Excel 导入)'
                                              : 'cdnjs(需要联网,否则 Excel 相关断言会失败)'));
+  console.log('pdf.js   : ' + (usedLocalPdf ? '本地 node_modules(离线也能测 PDF 导入)'
+                                            : '未安装 pdfjs-dist,PDF 套件会跳过'));
   if (!staffXlsx) {
     console.log('提示     : 没装 xlsx 依赖,导入环节改用粘贴名单。跑 npm install 可覆盖 Excel 路径。');
   }
@@ -36,7 +42,8 @@ const SUITES = {
   const reports = [];
   let failed = 0;
   for (const n of names) {
-    const R = await SUITES[n]({ url: server.url, fixtures: dir, staffXlsx });
+    const R = await SUITES[n]({ url: server.url, fixtures: dir, staffXlsx,
+                                staffPdf, blankPdf, usedLocalPdf });
     R.print();
     reports.push([n, R]);
     failed += R.failed;
