@@ -199,6 +199,38 @@ input,select{font:inherit;color:inherit}
 .ingot.empty{border-style:dashed;color:#8B7B6D}
 .ingot.empty .nm{font-weight:400}
 
+/* 全部抽完后的总榜:名字横排铺开,字号自动缩到一屏装得下 */
+.slots.wide{max-width:1600px}
+.board{width:100%;overflow-y:auto;--bfs:34px}
+.bgrp+.bgrp{margin-top:calc(var(--bfs) * .75)}
+.bgrp-h{
+  font-family:var(--f-util);font-size:calc(var(--bfs) * .52);letter-spacing:.14em;
+  color:var(--pour);text-align:center;margin-bottom:calc(var(--bfs) * .38);
+}
+/* 用 flex 而不是 grid:每行居中,格子按名字长短自适应。
+   一等奖只有一两个人时不会孤零零挂在左边。 */
+.bnames{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:calc(var(--bfs) * .32);
+}
+.bname{
+  flex:0 1 auto;min-width:calc(var(--bfs) * 4.5);max-width:100%;
+  background:var(--shell);border:1px solid var(--line);border-left:3px solid var(--pour);
+  border-radius:3px;padding:calc(var(--bfs)*.3) calc(var(--bfs)*.62);
+  text-align:center;overflow-wrap:anywhere;
+}
+.bname b{display:block;font-size:var(--bfs);font-weight:600;line-height:1.18}
+.bname span{
+  display:block;font-family:var(--f-util);font-size:calc(var(--bfs)*.42);
+  color:var(--ash);margin-top:2px;
+}
+/* 压轴那一档用铸钢的样子,和揭晓时的卡片呼应 */
+.bgrp.top .bname{
+  background:linear-gradient(168deg,var(--steel-hi),var(--steel-lo));
+  border-color:#EFF3F6;border-left-color:#fff;color:#171310;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);
+}
+.bgrp.top .bname span{color:#3B3833}
+
 /* controls */
 .controls{
   display:flex;align-items:center;justify-content:center;gap:14px;
@@ -295,9 +327,13 @@ td input{padding:9px 10px;font-size:15px}
 .wlist{max-height:400px;overflow-y:auto}
 .wgrp{margin-bottom:20px}
 .wgrp-h{font-family:var(--f-util);font-size:14px;letter-spacing:.14em;color:var(--pour);margin-bottom:11px}
-.wrow{display:flex;gap:12px;padding:11px 12px;border-left:2px solid var(--line);font-size:18px}
+.wrows{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr))}
+.wrow{
+  display:flex;flex-direction:column;gap:2px;padding:10px 12px;
+  border-left:2px solid var(--line);font-size:18px;overflow-wrap:anywhere;
+}
 .wrow b{font-weight:500}
-.wrow span{color:var(--ash);font-family:var(--f-util);font-size:14px;margin-left:auto;align-self:center}
+.wrow span{color:var(--ash);font-family:var(--f-util);font-size:13px}
 .empty-note{color:#A2958A;font-size:16px;text-align:center;padding:34px}
 
 .toast{
@@ -526,7 +562,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v8';
+var APP_VERSION = 'v9';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -838,10 +874,14 @@ function resetStage(){
   var slots = $('#slots');
   slots.innerHTML = '';
   slots.style.transform = '';
+  slots.classList.remove('wide');
   var cru = $('#crucible');
   cru.classList.remove('hot','hush','finale');
   cru.style.setProperty('--heat', 0);
   $('#chargeFill').style.width = '0%';
+
+  /* 全部抽完 → 总榜。要排在「名单为空」前面:人全抽光时 pool 也是空的 */
+  if (allDone()){ renderFinalBoard(); return; }
 
   if (!S.pool.length){
     $('#eyebrow').textContent = 'นำเข้ารายชื่อก่อนเริ่ม · 请先导入名单';
@@ -878,6 +918,7 @@ function renderShown(){
   var keep = $('#eyebrow').innerHTML;
   var slots = $('#slots');
   slots.innerHTML = ''; slots.style.transform = '';
+  slots.classList.remove('wide');
   var cru = $('#crucible');
   cru.classList.remove('hot','hush','finale');
   cru.style.setProperty('--heat', 0);
@@ -895,6 +936,58 @@ function renderShown(){
   $('#eyebrow').innerHTML = keep;
   updateControls();
   return true;
+}
+/* 全部奖项都抽满了 */
+function allDone(){
+  return S.tiers.length > 0 && S.winners.length > 0 && currentIndex() < 0;
+}
+/* 一屏放不下就把字号往下降一档,降到最小还放不下才允许滚动 */
+function fitBoard(board){
+  var cru = $('#crucible'), eb = $('#eyebrow');
+  var avail = cru.clientHeight - eb.offsetHeight - 56;
+  board.style.maxHeight = Math.max(160, avail) + 'px';
+  var sizes = [40, 34, 29, 25, 21, 18, 15, 13, 11];
+  for (var i = 0; i < sizes.length; i++){
+    board.style.setProperty('--bfs', sizes[i] + 'px');
+    if (board.scrollHeight <= board.clientHeight) break;
+  }
+}
+/* 抽奖结束的总榜:全部中奖者按奖项分组,名字横排铺开 */
+function renderFinalBoard(){
+  var slots = $('#slots');
+  slots.innerHTML = '';
+  slots.style.transform = '';
+  slots.style.gridTemplateColumns = '1fr';
+  slots.classList.add('wide');
+  $('#eyebrow').innerHTML =
+    'จบการจับรางวัล · <span class="cn">全部抽奖完成</span> &nbsp;·&nbsp; ' +
+    '<b>' + S.winners.length + '</b> <span class="cn">位中奖者</span>';
+
+  var board = el('div','board');
+  var last = S.tiers.length - 1;
+  S.tiers.forEach(function(t, i){
+    var ws = S.winners.filter(function(w){ return w.tierId === t.id; });
+    if (!ws.length) return;
+    var g = el('div','bgrp' + (i === last ? ' top' : ''));
+    g.appendChild(el('div','bgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน'));
+    var grid = el('div','bnames');
+    ws.forEach(function(w){
+      var c = el('div','bname');
+      c.appendChild(el('b', null, w.name));
+      if (w.sub) c.appendChild(el('span', null, w.sub));
+      grid.appendChild(c);
+    });
+    g.appendChild(grid);
+    board.appendChild(g);
+  });
+  // 压轴放最上面,一等奖先看到
+  var groups = [].slice.call(board.children).reverse();
+  board.innerHTML = '';
+  groups.forEach(function(g){ board.appendChild(g); });
+
+  slots.appendChild(board);
+  fitBoard(board);
+  updateControls();
 }
 function updateControls(){
   var t = tierById(S.activeTier);
@@ -934,6 +1027,7 @@ function startRoll(){
   var n = Math.min(slotCount(), S.pool.length), sz = sizeFor(n);
   var slots = $('#slots');
   slots.innerHTML = '';
+  slots.classList.remove('wide');
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
   for (var i = 0; i < n; i++){
     var card = el('div','ingot roll');
@@ -1037,6 +1131,10 @@ function stopRoll(){
       } else {
         $('#eyebrow').innerHTML = 'จบการจับรางวัล · <span class="cn">全部抽奖完成</span>';
         setTimeout(fanfare, 300);
+        /* 让最后一位在台上停一会儿,再切到全部中奖者的总榜 */
+        setTimeout(function(){
+          if (!S.rolling && allDone()){ S.shown = null; renderFinalBoard(); }
+        }, 2600);
       }
     }
     S.revealing = false;
@@ -1203,12 +1301,14 @@ function renderWinners(){
     if (!ws.length) return;
     var g = el('div','wgrp');
     g.appendChild(el('div','wgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน'));
+    var grid = el('div','wrows');
     ws.forEach(function(x, i){
       var r = el('div','wrow');
       r.appendChild(el('b', null, (i+1) + '.  ' + x.name));
       if (x.sub) r.appendChild(el('span', null, x.sub));
-      g.appendChild(r);
+      grid.appendChild(r);
     });
+    g.appendChild(grid);
     w.appendChild(g);
   });
 }
@@ -1506,6 +1606,7 @@ document.addEventListener('keydown', function(e){
 });
 window.addEventListener('resize', function(){
   if (S.rolling || S.revealing) return;      // 正在转 / 正在逐个揭晓,别插手
+  if (allDone()){ renderFinalBoard(); return; }   // 总榜:按新尺寸重排并重新缩放
   if (renderShown()) return;                 // 已揭晓的那一屏:按新尺寸重画,不清空
   resetStage();
 });

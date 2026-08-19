@@ -161,6 +161,41 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             st.pool + ' / ' + st.remain + ' / ' + st.total);
     R.check('全部抽完提示', /全部抽奖完成/.test(st.eyebrow), st.eyebrow);
 
+    // ---------- 4.5 结束总榜 ----------
+    await page.waitForTimeout(3000);          // 最后一位在台上停 2.6 秒后切总榜
+    const board = await page.evaluate(() => {
+      const b = document.querySelector('.board');
+      if (!b) return null;
+      return {
+        cells: [...document.querySelectorAll('.bname b')].map(e => e.textContent),
+        groups: document.querySelectorAll('.bgrp').length,
+        topFirst: document.querySelector('.bgrp').classList.contains('top'),
+        fits: b.scrollHeight <= b.clientHeight,
+        fs: getComputedStyle(b).getPropertyValue('--bfs').trim(),
+      };
+    });
+    const winnerNames = await page.evaluate(() => S.winners.map(w => w.name).sort());
+    R.check('抽完后自动列出全部中奖者',
+            board && board.cells.length === 14, board ? 'cells=' + board.cells.length : '没有总榜');
+    R.check('总榜名字与中奖记录一致',
+            board && JSON.stringify(board.cells.slice().sort()) === JSON.stringify(winnerNames));
+    R.check('三个奖项分组齐全,压轴排最上面', board && board.groups === 3 && board.topFirst);
+    R.check('总榜自动缩放到一屏放得下', board && board.fits, board && ('字号 ' + board.fs));
+
+    // 换个窗口尺寸,总榜要重排而不是消失
+    await page.setViewportSize({ width: 820, height: 640 });
+    await page.waitForTimeout(400);
+    const reflow = await page.evaluate(() => {
+      const b = document.querySelector('.board');
+      return b ? { cells: document.querySelectorAll('.bname').length,
+                   fits: b.scrollHeight <= b.clientHeight,
+                   fs: getComputedStyle(b).getPropertyValue('--bfs').trim() } : null;
+    });
+    R.check('改窗口尺寸后总榜重排且仍放得下',
+            reflow && reflow.cells === 14 && reflow.fits, reflow && ('字号 ' + reflow.fs));
+    await page.setViewportSize({ width: 1280, height: 860 });
+    await page.waitForTimeout(300);
+
     // ---------- 5. 中奖名单面板 ----------
     await page.click('#bWinners');
     await page.waitForSelector('#vWinners.on');
