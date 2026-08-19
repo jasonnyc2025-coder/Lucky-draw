@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;background:transparent}
+  #box{width:512px;height:512px}
+  #box>svg{display:block;width:100%;height:100%}
+  .v{display:none}
+  .v.on{display:block}
+</style></head>
+<body>
+<div id="box">
+
+<!-- 标准图标:铺满整个方形 -->
+<svg class="v on" id="std" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB047"/><stop offset="50%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
+    </linearGradient>
+    <radialGradient id="sHalo" cx="50%" cy="46%" r="52%">
+      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".55"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sBg)"/>
+  <circle cx="256" cy="236" r="200" fill="url(#sHalo)"/>
+  <path d="M256 74 C272 176 300 210 402 236 C300 262 272 296 256 398 C240 296 212 262 110 236 C212 210 240 176 256 74 Z"
+        fill="#FFFCF4"/>
+  <path d="M388 330 C395 372 407 386 448 394 C407 402 395 416 388 458 C381 416 369 402 328 394 C369 386 381 372 388 330 Z"
+        fill="#FFF3D6" opacity=".95"/>
+</svg>
+
+<!-- maskable:系统会把图标裁成圆形/水滴等各种形状,
+     所有内容必须落在中心 80% 直径的安全圆内(半径 204.8),
+     所以图形整体缩到 74% 并居中,背景仍然铺满。 -->
+<svg class="v" id="msk" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB047"/><stop offset="50%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
+    </linearGradient>
+    <radialGradient id="mHalo" cx="50%" cy="48%" r="46%">
+      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".55"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#mBg)"/>
+  <circle cx="256" cy="248" r="170" fill="url(#mHalo)"/>
+  <g transform="translate(256 256) scale(0.74) translate(-256 -248)">
+    <path d="M256 74 C272 176 300 210 402 236 C300 262 272 296 256 398 C240 296 212 262 110 236 C212 210 240 176 256 74 Z"
+          fill="#FFFCF4"/>
+    <path d="M388 330 C395 372 407 386 448 394 C407 402 395 416 388 458 C381 416 369 402 328 394 C369 386 381 372 388 330 Z"
+          fill="#FFF3D6" opacity=".95"/>
+  </g>
+</svg>
+
+</div>
+<script>
+window.setIcon = function(size, variant){
+  document.querySelectorAll('.v').forEach(function(v){ v.classList.remove('on'); });
+  document.getElementById(variant).classList.add('on');
+  var b = document.getElementById('box');
+  b.style.width = size + 'px';
+  b.style.height = size + 'px';
+};
+</script>
+</body></html>

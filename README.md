@@ -20,6 +20,7 @@
 | `manifest.webmanifest` | 应用名称、图标、启动方式 |
 | `sw.js` | Service Worker,离线缓存 |
 | `icon-*.png` `apple-touch-icon.png` `favicon-64.png` | 图标 |
+| `design/` | 图标源文件和生成脚本,不参与部署 |
 
 ## 测试
 
