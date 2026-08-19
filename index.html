@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>จับรางวัล · 抽奖</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#14100E">
+<meta name="theme-color" content="#221C19">
 <meta name="description" content="ระบบจับรางวัลสองภาษา ไทย-จีน · 泰中双语抽奖系统">
 <link rel="icon" href="./favicon-64.png" sizes="64x64" type="image/png">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
@@ -19,12 +19,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
-  --slag:#14100E;
-  --shell:#231C18;
-  --shell-2:#342A23;
-  --line:#57483E;
-  --ash:#BEB3A7;
-  --bone:#F5EFE7;
+  /* 底色。想换风格只改这 6 行,其余全部跟着走。
+     备选 B 中性炭灰:#26241F / #312E29 / #3D3931 / #605A50 / #C3BCB0 / #F0ECE4
+     备选 C 墨蓝    :#1C212A / #252C37 / #2F3846 / #4C5A6B / #B6BEC9 / #E9EEF4 */
+  --slag:#221C19;
+  --shell:#2C2521;
+  --shell-2:#382F29;
+  --line:#5C4C42;
+  --ash:#C0B5AA;
+  --bone:#EFE8E0;
   --pour:#FF8A1F;
   --whitehot:#FFE9C4;
   --steel-hi:#DDE2E6;
@@ -46,7 +49,7 @@ body{
 }
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:radial-gradient(120% 70% at 50% 108%, rgba(255,138,31,.13), transparent 60%);
+  background:radial-gradient(130% 74% at 50% 110%, rgba(255,138,31,.10), transparent 62%);
 }
 .cn{font-family:var(--f-cn)}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
@@ -223,7 +226,7 @@ input,select{font:inherit;color:inherit}
 
 /* ---------- drawer / modal ---------- */
 .veil{
-  position:fixed;inset:0;z-index:50;background:rgba(8,5,3,.78);
+  position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.72);
   backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px;
 }
 .veil.on{display:flex}
