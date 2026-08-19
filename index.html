@@ -153,10 +153,19 @@ input,select{font:inherit;color:inherit}
 @keyframes breathe{50%{opacity:calc(var(--heat) * .55)}}
 
 .eyebrow{
-  font-family:var(--f-util);font-weight:500;font-size:16px;letter-spacing:.16em;color:var(--bone);
-  margin-bottom:22px;text-align:center;min-height:16px;position:relative;z-index:2;
+  margin-bottom:20px;text-align:center;position:relative;z-index:2;
 }
-.eyebrow b{color:var(--pour);font-weight:600}
+/* 主行:当前抽的是哪个奖,投影上要看得清 */
+.eb-main{
+  font-family:var(--f-display);font-weight:600;
+  font-size:clamp(21px,3.4vw,36px);line-height:1.25;letter-spacing:.03em;color:var(--bone);
+}
+/* 副行:第几档、抽了几个 */
+.eb-sub{
+  font-family:var(--f-util);font-weight:600;
+  font-size:clamp(13px,1.5vw,18px);letter-spacing:.16em;color:var(--ash);margin-top:7px;
+}
+.eyebrow b{color:var(--pour);font-weight:700}
 
 .slots{
   display:grid;gap:12px;width:100%;max-width:1180px;
@@ -569,7 +578,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v12';
+var APP_VERSION = 'v13';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -876,6 +885,17 @@ function sizeFor(n){
   if (n <= 12) return {nm:'clamp(16px,2.1vw,28px)', sub:'11px', cols:4};
   return {nm:'clamp(14px,1.7vw,22px)', sub:'10px', cols:5};
 }
+function esc(t){
+  return String(t == null ? '' : t).replace(/[&<>]/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c];
+  });
+}
+/* 舞台标题固定两行:上面大字是奖项,下面小字是进度 */
+function eyebrow(main, sub){
+  $('#eyebrow').innerHTML = '<div class="eb-main">' + main + '</div>' +
+                            (sub ? '<div class="eb-sub">' + sub + '</div>' : '');
+}
+
 function resetStage(){
   S.frame = null; S.shown = null; S.revealing = false;
   var t = tierById(S.activeTier);
@@ -892,22 +912,23 @@ function resetStage(){
   if (allDone()){ renderFinalBoard(); return; }
 
   if (!S.pool.length){
-    $('#eyebrow').textContent = 'นำเข้ารายชื่อก่อนเริ่ม · 请先导入名单';
+    eyebrow('นำเข้ารายชื่อก่อนเริ่ม', '<span class="cn">请先导入名单</span>');
     slots.style.gridTemplateColumns = '1fr';
     var c0 = el('div','ingot empty'); var n0 = el('div','nm','— — —');
     n0.style.fontSize = 'clamp(28px,5vw,56px)'; c0.appendChild(n0); slots.appendChild(c0);
     updateControls(); return;
   }
   if (!t){
-    $('#eyebrow').textContent = 'เลือกรางวัล · 请选择奖项';
+    eyebrow('เลือกรางวัล', '<span class="cn">请选择奖项</span>');
     updateControls(); return;
   }
   var got = wonIn(t.id);
   var pos = tierIndex(t.id), last = pos === S.tiers.length - 1;
-  $('#eyebrow').innerHTML =
-    '<span style="opacity:.78">' + (pos + 1) + '/' + S.tiers.length + '</span> &nbsp;·&nbsp; ' +
-    t.th + ' &nbsp;·&nbsp; <span class="cn">' + t.zh + '</span> &nbsp;·&nbsp; <b>' + got + '/' + t.quota + '</b>' +
-    (last ? ' &nbsp;·&nbsp; <span style="color:var(--pour)">รางวัลสุดท้าย 压轴</span>' : '');
+  eyebrow(
+    esc(t.th) + ' &nbsp;·&nbsp; <span class="cn">' + esc(t.zh) + '</span>',
+    '<span style="opacity:.8">' + (pos + 1) + '/' + S.tiers.length + '</span> &nbsp;·&nbsp; ' +
+    'จับแล้ว <b>' + got + '/' + t.quota + '</b>' +
+    (last ? ' &nbsp;·&nbsp; <span style="color:var(--pour)">รางวัลสุดท้าย 压轴</span>' : ''));
 
   var n = slotCount(), sz = sizeFor(n);
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
@@ -967,9 +988,8 @@ function renderFinalBoard(){
   slots.style.transform = '';
   slots.style.gridTemplateColumns = '1fr';
   slots.classList.add('wide');
-  $('#eyebrow').innerHTML =
-    'จบการจับรางวัล · <span class="cn">全部抽奖完成</span> &nbsp;·&nbsp; ' +
-    '<b>' + S.winners.length + '</b> <span class="cn">位中奖者</span>';
+  eyebrow('จบการจับรางวัล · <span class="cn">全部抽奖完成</span>',
+          '<b>' + S.winners.length + '</b> <span class="cn">位中奖者</span>');
 
   var board = el('div','board');
   var last = S.tiers.length - 1;
@@ -1128,16 +1148,18 @@ function stopRoll(){
 
   setTimeout(function(){
     var got = wonIn(t.id), full = got >= t.quota;
-    $('#eyebrow').innerHTML = 'ยินดีด้วย · <span class="cn">恭喜</span> &nbsp;·&nbsp; ' + t.th +
-      ' &nbsp;<b>' + got + '/' + t.quota + '</b>';
+    var main = 'ยินดีด้วย · <span class="cn">恭喜</span>';
+    var sub  = esc(t.th) + ' &nbsp;·&nbsp; <span class="cn">' + esc(t.zh) + '</span>' +
+               ' &nbsp;·&nbsp; <b>' + got + '/' + t.quota + '</b>';
     if (full){
       var nx = currentIndex();
       if (nx >= 0){
         S.activeTier = S.tiers[nx].id;
-        $('#eyebrow').innerHTML += ' &nbsp;→&nbsp; <span style="color:var(--pour)">ถัดไป ' +
-          S.tiers[nx].th + ' · <span class="cn">' + S.tiers[nx].zh + '</span></span>';
+        sub += ' &nbsp;→&nbsp; <span style="color:var(--pour)">ถัดไป ' +
+          esc(S.tiers[nx].th) + ' · <span class="cn">' + esc(S.tiers[nx].zh) + '</span></span>';
       } else {
-        $('#eyebrow').innerHTML = 'จบการจับรางวัล · <span class="cn">全部抽奖完成</span>';
+        main = 'จบการจับรางวัล · <span class="cn">全部抽奖完成</span>';
+        sub = '';
         setTimeout(fanfare, 300);
         /* 让最后一位在台上停一会儿,再切到全部中奖者的总榜 */
         setTimeout(function(){
@@ -1145,6 +1167,7 @@ function stopRoll(){
         }, 2600);
       }
     }
+    eyebrow(main, sub);
     S.revealing = false;
     renderRail();
   }, HUSH + picked.length * STEP + 300);
