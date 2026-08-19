@@ -59,8 +59,8 @@ input,select{font:inherit;color:inherit}
 .app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
 
 .topbar{
-  display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;
-  padding:14px 22px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;
+  padding:12px 18px;border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,rgba(255,255,255,.03),transparent);
 }
 .logo{height:38px;width:auto;max-width:170px;object-fit:contain;display:none}
@@ -76,11 +76,14 @@ input,select{font:inherit;color:inherit}
 .tally b{color:var(--pour);font-size:17px}
 
 .tbtn{
-  font-family:var(--f-util);font-size:14px;font-weight:600;letter-spacing:.1em;
-  padding:9px 15px;border:1px solid var(--line);border-radius:2px;color:var(--ash);
+  font-family:var(--f-util);font-size:17px;font-weight:600;letter-spacing:.08em;
+  padding:12px 20px;border:1px solid #6E5C4F;border-radius:3px;color:var(--bone);
+  background:rgba(255,255,255,.045);
   transition:.18s;white-space:nowrap;
 }
-.tbtn:hover{color:var(--bone);border-color:var(--ash)}
+.tbtn.icon{font-size:19px;padding:11px 15px;line-height:1}
+.tbtn:hover{color:var(--whitehot);border-color:var(--pour);background:rgba(255,138,31,.14)}
+.tbtn:active{background:rgba(255,138,31,.24)}
 .tbtn:focus-visible{outline:2px solid var(--pour);outline-offset:2px}
 .tbtn.muted{color:#8D7D6F;border-color:#453931}
 .logo-prev{max-height:70px;max-width:230px;object-fit:contain;background:var(--slag);border:1px solid var(--line);border-radius:3px;padding:8px;display:none}
@@ -352,9 +355,12 @@ td input{padding:9px 10px;font-size:15px}
   .rail-h{display:none}
   .tier{min-width:150px;margin-bottom:0;flex-shrink:0}
   .brand span{display:none}
+  .brand b{font-size:16px;letter-spacing:.06em}
+  .topbar{padding:10px 12px;gap:8px}
+  .tbtn{font-size:16px;padding:11px 14px;letter-spacing:.04em}
+  .tbtn.icon{font-size:18px;padding:10px 12px}
   .pour{min-width:0;flex:1;font-size:19px;padding:17px 18px}
   .controls{padding:14px}
-  .topbar{padding:10px 14px;gap:8px}
   .tally{display:none}
 }
 /* 很窄的屏:主按钮独占一行,避免被两侧按钮挤成两行 */
@@ -379,12 +385,12 @@ td input{padding:9px 10px;font-size:15px}
     </div>
     <div class="tally">เหลือ 剩余 <b id="tRemain">0</b> / <span id="tTotal">0</span></div>
     <button class="tbtn" id="bNames">รายชื่อ 名单</button>
-    <button class="tbtn" id="bTiers">รางวัล 奖项</button>
     <button class="tbtn" id="bWinners">ผู้โชคดี 中奖</button>
+    <button class="tbtn" id="bTiers">รางวัล 奖项</button>
     <button class="tbtn" id="bInstall" style="display:none">⬇ ติดตั้ง 安装</button>
     <button class="tbtn" id="bSetup">ตั้งค่า 设置</button>
-    <button class="tbtn" id="bSound">🔊</button>
-    <button class="tbtn" id="bFull">⛶</button>
+    <button class="tbtn icon" id="bSound">🔊</button>
+    <button class="tbtn icon" id="bFull">⛶</button>
   </header>
 
   <div class="main">
@@ -562,7 +568,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v9';
+var APP_VERSION = 'v10';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
