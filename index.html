@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>จับรางวัล · 抽奖</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#14100E">
+<meta name="description" content="ระบบจับรางวัลสองภาษา ไทย-จีน · 泰中双语抽奖系统">
+<link rel="icon" href="./favicon-64.png" sizes="64x64" type="image/png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="จับรางวัล">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;600;700&family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -326,6 +335,7 @@ td input{padding:8px 9px;font-size:13px}
     <button class="tbtn" id="bNames">รายชื่อ 名单</button>
     <button class="tbtn" id="bTiers">รางวัล 奖项</button>
     <button class="tbtn" id="bWinners">ผู้โชคดี 中奖</button>
+    <button class="tbtn" id="bInstall" style="display:none">⬇ ติดตั้ง 安装</button>
     <button class="tbtn" id="bSetup">ตั้งค่า 设置</button>
     <button class="tbtn" id="bSound">🔊</button>
     <button class="tbtn" id="bFull">⛶</button>
@@ -426,6 +436,19 @@ td input{padding:8px 9px;font-size:13px}
   <div class="panel">
     <div class="panel-h"><h2>ตั้งค่า <em class="cn">设置</em></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
     <div class="panel-b">
+
+      <div class="sec">
+        <div class="sec-h">แอป · 应用</div>
+        <div class="row">
+          <button class="solid" id="bInstall2" style="display:none">ติดตั้งลงเครื่อง 安装到设备</button>
+          <button class="ghost" id="bUpdate" style="display:none">มีเวอร์ชันใหม่ 有新版本,点此更新</button>
+          <span class="hint" style="margin:0" id="swNote">กำลังตรวจสอบ… 检查中…</span>
+        </div>
+        <p class="hint">安装后可脱离浏览器独立运行,断网也能用。<br>
+        <b>Android / Chrome</b>:点上面的按钮,或浏览器菜单「添加到主屏幕」。<br>
+        <b>iPhone / iPad</b>:Safari 打开 → 分享按钮 → 「添加到主屏幕」。<br>
+        <b>Windows / Mac</b>:Chrome 或 Edge 地址栏右侧的安装图标。</p>
+      </div>
 
       <div class="sec">
         <div class="sec-h">ความคืบหน้า · 进度存档</div>
@@ -1279,6 +1302,93 @@ window.addEventListener('resize', function(){ if (!S.rolling) resetStage(); });
 syncActive();
 renderRail();
 resetStage();
+
+/* ---------- PWA: install + offline + update ---------- */
+(function(){
+  var deferred = null;
+  var note = $('#swNote');
+
+  function setNote(txt){ if (note) note.textContent = txt; }
+  function showInstall(on){
+    $('#bInstall').style.display  = on ? '' : 'none';
+    $('#bInstall2').style.display = on ? '' : 'none';
+  }
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferred = e;
+    showInstall(true);
+    setNote('พร้อมติดตั้ง · 可以安装到设备');
+  });
+  function doInstall(){
+    if (!deferred){
+      toast('ใช้เมนูเบราว์เซอร์ · 请用浏览器菜单「添加到主屏幕」');
+      return;
+    }
+    deferred.prompt();
+    deferred.userChoice.then(function(c){
+      if (c.outcome === 'accepted'){ showInstall(false); setNote('ติดตั้งแล้ว · 已安装'); }
+      deferred = null;
+    });
+  }
+  $('#bInstall').onclick = doInstall;
+  $('#bInstall2').onclick = doInstall;
+
+  window.addEventListener('appinstalled', function(){
+    showInstall(false);
+    setNote('ติดตั้งแล้ว · 已安装');
+    toast('ติดตั้งสำเร็จ · 已安装到设备');
+  });
+
+  var standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                   window.matchMedia('(display-mode: fullscreen)').matches ||
+                   window.navigator.standalone === true;
+
+  if (!('serviceWorker' in navigator)){
+    setNote('เบราว์เซอร์นี้ใช้ออฟไลน์ไม่ได้ · 此浏览器不支持离线');
+    return;
+  }
+  if (location.protocol === 'file:'){
+    setNote('เปิดผ่าน https · 需通过 https 打开才能离线使用');
+    return;
+  }
+
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
+    if (standalone) setNote('พร้อมใช้ออฟไลน์ · 已安装,可离线使用');
+    else setNote(navigator.onLine ? 'พร้อมใช้ออฟไลน์ · 离线可用已就绪' : 'ออฟไลน์ · 当前离线,正常运行');
+
+    function watch(w){
+      if (!w) return;
+      w.addEventListener('statechange', function(){
+        if (w.state === 'installed' && navigator.serviceWorker.controller){
+          $('#bUpdate').style.display = '';
+          $('#bUpdate').onclick = function(){
+            w.postMessage('skip-waiting');
+            setTimeout(function(){ location.reload(); }, 250);
+          };
+          toast('มีเวอร์ชันใหม่ · 有新版本,可在设置里更新');
+        }
+      });
+    }
+    if (reg.waiting){ watch(reg.waiting); $('#bUpdate').style.display = ''; }
+    reg.addEventListener('updatefound', function(){ watch(reg.installing); });
+
+    /* 别在抽奖过程中自动刷新 */
+    setInterval(function(){ if (!S.rolling) reg.update(); }, 60 * 60 * 1000);
+  }).catch(function(){
+    setNote('ลงทะเบียนออฟไลน์ไม่สำเร็จ · 离线功能注册失败');
+  });
+
+  window.addEventListener('offline', function(){ toast('ออฟไลน์ · 已断网,程序继续正常运行'); });
+})();
+
+/* 抽奖过程中防误关 */
+window.addEventListener('beforeunload', function(e){
+  if (S.rolling || (S.winners.length && S.pool.length)){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>
