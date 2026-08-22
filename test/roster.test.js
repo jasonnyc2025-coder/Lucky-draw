@@ -150,6 +150,56 @@ module.exports = async function run({ url }) {
             reopened.includes('改过的名字/ZZZ') && !reopened.some(x => x.startsWith('王芳')),
             reopened.join(', '));
 
+    // ---------- 9. 一键清空名单 ----------
+    const p3 = await ctx.newPage();
+    p3.on('pageerror', e => errs.push(e.message));
+    let dlg3 = [], accept3 = true;
+    p3.on('dialog', d => { dlg3.push(d.message()); accept3 ? d.accept() : d.dismiss(); });
+    await p3.goto(url, { waitUntil: 'load' });
+    await p3.waitForTimeout(1400);
+    const before9 = await p3.evaluate(() => ({ pool: S.pool.length, winners: S.winners.length,
+                                               tiers: S.tiers.length }));
+    R.check('清空前有数据可清', before9.pool + before9.winners > 0, JSON.stringify(before9));
+
+    await p3.click('#bNames'); await p3.waitForTimeout(250);
+
+    // 先点取消
+    accept3 = false; dlg3 = [];
+    await p3.click('#bClearPool'); await p3.waitForTimeout(300);
+    const cancelled9 = await p3.evaluate(() => S.pool.length + S.winners.length);
+    R.check('清空会弹确认框,写明清掉多少人、什么会保留',
+            dlg3.length === 1 && /清空整份名单/.test(dlg3[0]) &&
+            /奖项设置和 Logo 保留/.test(dlg3[0]), (dlg3[0] || '').replace(/\n+/g, ' | '));
+    R.check('点取消一个人都不少',
+            cancelled9 === before9.pool + before9.winners, 'still ' + cancelled9);
+
+    // 再确认
+    accept3 = true;
+    await p3.click('#bClearPool'); await p3.waitForTimeout(400);
+    const after9 = await p3.evaluate(() => ({
+      pool: S.pool.length, winners: S.winners.length, history: S.history.length,
+      tiers: S.tiers.length, rows: document.querySelectorAll('#plist .prow').length,
+      summary: document.querySelector('#poolSummary').textContent.trim(),
+      eyebrow: document.querySelector('#eyebrow').textContent,
+    }));
+    R.check('确认后人和中奖结果全清',
+            after9.pool === 0 && after9.winners === 0 && after9.history === 0 && after9.rows === 0,
+            JSON.stringify(after9));
+    R.check('奖项设置保留下来', after9.tiers === before9.tiers,
+            before9.tiers + ' → ' + after9.tiers);
+    R.check('界面回到「请先导入名单」',
+            /还没有导入名单/.test(after9.summary) && /请先导入名单/.test(after9.eyebrow),
+            after9.summary);
+
+    // 清空要写进本机存档
+    await p3.close();
+    const p4 = await ctx.newPage();
+    p4.on('pageerror', e => errs.push(e.message));
+    await p4.goto(url, { waitUntil: 'load' });
+    await p4.waitForTimeout(1400);
+    R.check('清空后重开页面,名单确实是空的',
+            await p4.evaluate(() => S.pool.length === 0 && S.winners.length === 0));
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();

@@ -464,10 +464,13 @@ td input{padding:9px 10px;font-size:15px}
         <p class="hint" style="margin-top:0" id="poolSummary">…</p>
         <div class="row" style="margin-top:10px">
           <button class="ghost" id="bAddPerson">+ เพิ่มคน 添加一人</button>
+          <button class="ghost" id="bClearPool" style="margin-left:auto">🗑 ล้างรายชื่อ 清空名单</button>
         </div>
         <p class="hint" style="margin-top:10px">✎ 改名字或工号 · × 从名单里删除。已中奖的(打勾那些)只能改名,
         要删得先「撤销上一轮」或「重置」。<br>
-        临时来人直接点「添加一人」,不用重新导整份名单。</p>
+        临时来人直接点「添加一人」,不用重新导整份名单。<br>
+        <b style="color:var(--pour)">下次活动重新开始</b>:点「清空名单」一次清掉所有人和中奖结果,
+        奖项设置和 Logo 保留,然后直接导入新名单。</p>
         <div class="plist" id="plist"></div>
       </div>
 
@@ -622,7 +625,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v19';
+var APP_VERSION = 'v20';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1591,6 +1594,25 @@ function addPerson(){
   toast('เพิ่มแล้ว · 已添加 ' + name + ' · 现在共 ' + (S.pool.length + S.winners.length) + ' 人');
 }
 
+/* 下次活动重新开始用的:一次清掉所有人和已开出的结果。
+   奖项设置和 Logo 每次活动基本不变,保留。 */
+function clearRoster(){
+  var total = S.pool.length + S.winners.length;
+  if (!total){ toast('รายชื่อว่างอยู่แล้ว · 名单已经是空的'); return; }
+  if (!confirm(
+    'ล้างรายชื่อทั้งหมด?  清空整份名单?\n\n' +
+    '会删掉全部 ' + total + ' 人(' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖),\n' +
+    '已经开出的中奖结果一并清空。\n\n' +
+    '奖项设置和 Logo 保留。\n\n' +
+    '这一步无法撤销 —— 要留底的话先到「设置 → 保存进度」导出。')) return;
+
+  S.pool = []; S.winners = []; S.history = [];
+  syncActive();
+  autosave();
+  renderPoolList(); renderRail(); resetStage();
+  toast('ล้างแล้ว · 名单已清空,可以导入新名单了');
+}
+
 function deletePerson(kind, idx){
   if (kind === 'winner'){
     toast('ลบผู้ได้รางวัลไม่ได้ · 已中奖的不能删,请先「撤销上一轮」或「重置」');
@@ -1874,6 +1896,7 @@ $('#bApplyPaste').onclick = function(){
 };
 
 $('#bAddPerson').onclick = addPerson;
+$('#bClearPool').onclick = clearRoster;
 
 $('#bAddTier').onclick = function(){
   S.tiers.push({id:++uid, th:'รางวัลใหญ่', zh:'特等奖', quota:1, per:1});
