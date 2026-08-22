@@ -462,8 +462,12 @@ td input{padding:9px 10px;font-size:15px}
       <div class="sec">
         <div class="sec-h">รายชื่อปัจจุบัน · 当前名单</div>
         <p class="hint" style="margin-top:0" id="poolSummary">…</p>
-        <p class="hint" style="margin-top:6px">✎ 改名字或工号 · × 从名单里删除。已中奖的(打勾那些)只能改名,
-        要删得先「撤销上一轮」或「重置」。</p>
+        <div class="row" style="margin-top:10px">
+          <button class="ghost" id="bAddPerson">+ เพิ่มคน 添加一人</button>
+        </div>
+        <p class="hint" style="margin-top:10px">✎ 改名字或工号 · × 从名单里删除。已中奖的(打勾那些)只能改名,
+        要删得先「撤销上一轮」或「重置」。<br>
+        临时来人直接点「添加一人」,不用重新导整份名单。</p>
         <div class="plist" id="plist"></div>
       </div>
 
@@ -618,7 +622,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v18';
+var APP_VERSION = 'v19';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1565,6 +1569,28 @@ function editPerson(kind, idx){
   toast('แก้ไขแล้ว · 已改为 ' + name);
 }
 
+function addPerson(){
+  var line = prompt('เพิ่มคน · 添加一人\n\n格式:姓名, 工号(工号可以留空)', '');
+  if (line === null) return;
+  var parts = String(line).split(/[,,\t]/);
+  var name = (parts[0] || '').trim();
+  var sub  = (parts[1] || '').trim();
+  if (!name){ toast('ชื่อว่างไม่ได้ · 名字不能为空'); return; }
+
+  /* 同名同工号多半是手滑加重了。同名不同工号是两个人,直接放行。 */
+  var dup = S.pool.concat(S.winners).some(function(x){
+    return x.name === name && (x.sub || '') === sub;
+  });
+  if (dup && !confirm('มีชื่อนี้แล้ว · 名单里已经有一模一样的了\n\n' +
+                      name + (sub ? '(' + sub + ')' : '') +
+                      '\n\n还要再加一个吗?(同名不同工号是两个人,可以加)')) return;
+
+  S.pool.push({ name: name, sub: sub });
+  autosave();
+  renderPoolList(); renderRail(); updateControls();
+  toast('เพิ่มแล้ว · 已添加 ' + name + ' · 现在共 ' + (S.pool.length + S.winners.length) + ' 人');
+}
+
 function deletePerson(kind, idx){
   if (kind === 'winner'){
     toast('ลบผู้ได้รางวัลไม่ได้ · 已中奖的不能删,请先「撤销上一轮」或「重置」');
@@ -1846,6 +1872,8 @@ $('#bApplyPaste').onclick = function(){
   setPool(list);
   $('#vNames').classList.remove('on');
 };
+
+$('#bAddPerson').onclick = addPerson;
 
 $('#bAddTier').onclick = function(){
   S.tiers.push({id:++uid, th:'รางวัลใหญ่', zh:'特等奖', quota:1, per:1});

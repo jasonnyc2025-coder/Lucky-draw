@@ -69,6 +69,45 @@ module.exports = async function run({ url }) {
     R.check('删除后列表和统计同步', st.rows === 5 && /共\s*5\s*人/.test(st.summary), st.summary);
     await closeNames();
 
+    // ---------- 5.5 添加一人 ----------
+    await openNames();
+    promptReply = '临时来的, EMP999';
+    await page.click('#bAddPerson');
+    await page.waitForTimeout(300);
+    st = await state();
+    R.check('添加一人进池子并出现在列表里',
+            st.pool.length === 6 && st.pool.includes('临时来的/EMP999') && st.rows === 6,
+            st.pool.join(', '));
+
+    promptReply = '   ';                      // 空名字
+    await page.click('#bAddPerson');
+    await page.waitForTimeout(300);
+    R.check('空名字加不进去',
+            (await state()).pool.length === 6,
+            await page.evaluate(() => document.querySelector('#toast').textContent));
+
+    promptReply = null;                       // 点取消
+    await page.click('#bAddPerson');
+    await page.waitForTimeout(300);
+    R.check('添加点取消什么都不加', (await state()).pool.length === 6);
+
+    // 同名同工号要先问一句;这里的 dialog 处理器一律 accept,所以会加进去
+    promptReply = '临时来的, EMP999';
+    await page.click('#bAddPerson');
+    await page.waitForTimeout(300);
+    R.check('同名同工号会先确认,确认后才加',
+            (await state()).pool.filter(x => x === '临时来的/EMP999').length === 2,
+            (await state()).pool.join(', '));
+
+    // 加进去的人要能被抽到,先删掉这两个免得影响后面的计数
+    await page.evaluate(() => {
+      S.pool = S.pool.filter(x => x.sub !== 'EMP999');
+      autosave(); renderPoolList(); renderRail(); updateControls();
+    });
+    await page.waitForTimeout(200);
+    R.check('清理后回到 5 人', (await state()).pool.length === 5);
+    await closeNames();
+
     // ---------- 6. 中奖者:能改名,不能删 ----------
     await page.click('#bPour');
     await page.waitForTimeout(1300);
