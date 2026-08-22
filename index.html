@@ -298,8 +298,25 @@ input,select{font:inherit;color:inherit}
 .panel-h h2{font-size:22px;font-weight:500;margin-right:auto}
 .panel-h h2 em{font-style:normal;font-size:15px;color:var(--ash);margin-left:9px;font-family:var(--f-cn)}
 .panel-b{padding:22px}
-.sec+.sec{margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
-.sec-h{font-family:var(--f-util);font-size:12px;letter-spacing:.2em;color:var(--ash);margin-bottom:14px}
+.sec{
+  background:var(--shell-2);border:1px solid var(--line);border-radius:5px;padding:16px 18px 20px;
+}
+.sec+.sec{margin-top:18px}
+.sec-h{
+  font-family:var(--f-util);font-size:14px;letter-spacing:.14em;color:var(--whitehot);
+  margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid var(--line);
+}
+.sub+.sub{margin-top:20px;padding-top:20px;border-top:1px dashed var(--line)}
+.sub-h{
+  font-family:var(--f-util);font-size:15px;letter-spacing:.05em;color:var(--bone);
+  display:flex;align-items:flex-start;gap:10px;margin-bottom:13px;
+}
+.sub-h i{
+  font-style:normal;flex:none;width:24px;height:24px;border-radius:50%;
+  border:1px solid var(--pour);color:var(--pour);font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+}
+.sub-h em{display:block;font-style:normal;font-size:13px;color:var(--ash);letter-spacing:0;margin-top:4px}
 
 .drop{
   border:1px dashed var(--line);border-radius:3px;padding:26px;text-align:center;transition:.18s;
@@ -475,7 +492,10 @@ td input{padding:9px 10px;font-size:15px}
       </div>
 
       <div class="sec">
-        <div class="sec-h">นำเข้าไฟล์ · 导入文件</div>
+        <div class="sec-h">นำเข้ารายชื่อ · 导入名单(两种方式,任选一种)</div>
+
+        <div class="sub">
+        <div class="sub-h"><i>1</i><span>นำเข้าไฟล์ · 从文件导入<em>Excel · CSV · PDF</em></span></div>
         <div class="drop" id="drop">
           <label class="filepick">เลือกไฟล์ 选择文件<input type="file" id="file" accept=".csv,.xlsx,.xls,.txt,.pdf" hidden></label>
           <p>Excel (.xlsx / .xls) · CSV · PDF · ลากไฟล์มาวางได้ 可拖拽</p>
@@ -492,14 +512,15 @@ td input{padding:9px 10px;font-size:15px}
           </div>
           <div class="hint" id="mapPreview"></div>
         </div>
-      </div>
+        </div>
 
-      <div class="sec">
-        <div class="sec-h">หรือวางรายชื่อ · 或直接粘贴(一行一人,可用逗号加工号)</div>
+        <div class="sub">
+        <div class="sub-h"><i>2</i><span>หรือวางรายชื่อ · 或直接粘贴<em>一行一人,可用逗号加工号</em></span></div>
         <textarea id="paste"></textarea>
         <div class="row" style="margin-top:12px">
           <button class="solid" id="bApplyPaste">ใช้รายชื่อนี้ 使用此名单</button>
           <span class="hint" style="margin:0" id="poolNote"></span>
+        </div>
         </div>
       </div>
     </div>
@@ -625,7 +646,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v20';
+var APP_VERSION = 'v21';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
