@@ -14,17 +14,19 @@ npm test
 
 ```bash
 npm run test:draw       # 抽奖全流程
+npm run test:roster     # 名单增删改
 npm run test:pdf        # PDF 导入
 npm run test:storage    # 本机存档
 ```
 
 全部通过时退出码 0,有失败是 1,可以直接接 CI。
 
-## 三个套件
+## 四个套件
 
 | 文件 | 覆盖 |
 |---|---|
 | `draw.test.js` | Excel 导入、列映射、奖项设置、顺序锁定、四轮开奖、所见即所得、去重、结束总榜、中奖名单渲染、导出 CSV、保存进度、撤销、重置、从文件恢复、空格键、粘贴导入 |
+| `roster.test.js` | 名单面板:看当前名单、改名、删人、中奖者只能改不能删、改动存进本机 |
 | `pdf.test.js` | PDF 导入:按文字坐标还原行列、跨页重复表头去重、扫描件的错误提示 |
 | `storage.test.js` | 自动存档、**真的关掉页面重新打开**后名单/Logo/奖项/中奖记录是否都在、自动保存开关、清除本机数据 |
 

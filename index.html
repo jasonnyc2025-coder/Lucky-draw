@@ -351,6 +351,25 @@ td input{padding:9px 10px;font-size:15px}
 .wlist{max-height:400px;overflow-y:auto}
 .wgrp{margin-bottom:20px}
 .wgrp-h{font-family:var(--f-util);font-size:14px;letter-spacing:.14em;color:var(--pour);margin-bottom:11px}
+.plist{
+  display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,215px),1fr));
+  max-height:320px;overflow-y:auto;margin-top:10px;
+}
+.prow{
+  display:flex;align-items:center;gap:4px;
+  padding:6px 4px 6px 10px;border-left:2px solid var(--line);font-size:15px;
+}
+.pinfo{flex:1;min-width:0;overflow-wrap:anywhere}
+.pinfo span{display:block;color:var(--ash);font-family:var(--f-util);font-size:12px;margin-top:1px}
+.prow.won{opacity:.6;border-left-color:var(--pour)}
+.prow.won .pinfo b::after{content:' ✓';color:var(--pour)}
+.pbtn{
+  flex:none;width:34px;height:34px;border-radius:3px;color:var(--ash);
+  border:1px solid transparent;font-size:16px;line-height:1;transition:.14s;
+}
+.pbtn:hover{background:rgba(255,255,255,.07);color:var(--bone);border-color:var(--line)}
+.pbtn.del:hover{color:#E2603A;border-color:#E2603A}
+
 .wrows{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr))}
 .wrow{
   display:flex;flex-direction:column;gap:2px;padding:10px 12px;
@@ -364,6 +383,7 @@ td input{padding:9px 10px;font-size:15px}
   position:fixed;left:50%;bottom:26px;transform:translate(-50%,90px);z-index:90;
   background:var(--shell-2);border:1px solid var(--line);border-left:3px solid var(--pour);
   padding:14px 22px;border-radius:2px;font-size:16px;transition:transform .28s;max-width:90vw;
+  pointer-events:none;      /* 提示条只是给人看的,别挡住底下的按钮 */
 }
 .toast.on{transform:translate(-50%,0)}
 
@@ -439,6 +459,14 @@ td input{padding:9px 10px;font-size:15px}
   <div class="panel">
     <div class="panel-h"><h2>รายชื่อผู้เข้าร่วม <em class="cn">参与名单</em></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
     <div class="panel-b">
+      <div class="sec">
+        <div class="sec-h">รายชื่อปัจจุบัน · 当前名单</div>
+        <p class="hint" style="margin-top:0" id="poolSummary">…</p>
+        <p class="hint" style="margin-top:6px">✎ 改名字或工号 · × 从名单里删除。已中奖的(打勾那些)只能改名,
+        要删得先「撤销上一轮」或「重置」。</p>
+        <div class="plist" id="plist"></div>
+      </div>
+
       <div class="sec">
         <div class="sec-h">นำเข้าไฟล์ · 导入文件</div>
         <div class="drop" id="drop">
@@ -590,7 +618,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v16';
+var APP_VERSION = 'v18';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1461,6 +1489,98 @@ function renderTierRows(){
   });
 }
 
+/* ---------- 当前名单 ---------- */
+var PLIST_CAP = 300;          // 名单很大时只画前 300 条,避免开面板卡顿
+function renderPoolList(){
+  var box = $('#plist'), sum = $('#poolSummary');
+  if (!box || !sum) return;
+  box.innerHTML = '';
+
+  var total = S.pool.length + S.winners.length;
+  if (!total){
+    sum.textContent = 'ยังไม่มีรายชื่อ · 还没有导入名单,用下面的方式导入(Excel / CSV / PDF / 直接粘贴)。';
+    return;
+  }
+  sum.innerHTML = '共 <b style="color:var(--pour)">' + total + '</b> 人 · ' +
+                  S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖' +
+                  (total > PLIST_CAP ? ' · 下面只列出前 ' + PLIST_CAP + ' 条' : '');
+
+  /* 待抽的排前面,已中奖的排后面并打勾 */
+  var all = S.pool.map(function(p){ return { p:p, won:false }; })
+    .concat(S.winners.map(function(w){ return { p:w, won:true }; }));
+
+  all.slice(0, PLIST_CAP).forEach(function(x, i){
+    var r = el('div','prow' + (x.won ? ' won' : ''));
+    var info = el('div','pinfo');
+    info.appendChild(el('b', null, x.p.name));
+    if (x.p.sub) info.appendChild(el('span', null, x.p.sub));
+    r.appendChild(info);
+
+    var kind = x.won ? 'winner' : 'pool';
+    var idx  = x.won ? i - S.pool.length : i;
+
+    var ed = el('button','pbtn','✎');
+    ed.title = 'แก้ไข 改名';
+    ed.onclick = function(){ editPerson(kind, idx); };
+    r.appendChild(ed);
+
+    var rm = el('button','pbtn del','×');
+    rm.title = 'ลบ 删除';
+    rm.onclick = function(){ deletePerson(kind, idx); };
+    r.appendChild(rm);
+
+    box.appendChild(r);
+  });
+}
+
+/* 改完名字之后,凡是引用这个人的地方都要跟着改 */
+function editPerson(kind, idx){
+  var cur = kind === 'pool' ? S.pool[idx] : S.winners[idx];
+  if (!cur) return;
+  var line = prompt(
+    'แก้ไขรายชื่อ · 修改\n\n格式:姓名, 工号(工号可以留空)',
+    cur.name + (cur.sub ? ', ' + cur.sub : ''));
+  if (line === null) return;                       // 点了取消
+  var parts = String(line).split(/[,,\t]/);
+  var name = (parts[0] || '').trim();
+  var sub  = (parts[1] || '').trim();
+  if (!name){ toast('ชื่อว่างไม่ได้ · 名字不能为空'); return; }
+
+  var old = { name: cur.name, sub: cur.sub };
+  cur.name = name; cur.sub = sub;
+
+  /* S.winners 里存的是副本,撤销用的 S.history 里是原始对象,两边都要同步,
+     否则改完名字一撤销又变回旧名字。 */
+  if (kind === 'winner'){
+    S.history.forEach(function(h){
+      h.people.forEach(function(pp){
+        if (pp.name === old.name && pp.sub === old.sub){ pp.name = name; pp.sub = sub; }
+      });
+    });
+  }
+
+  autosave();
+  renderPoolList(); renderRail();
+  if (allDone()) renderFinalBoard(); else updateControls();
+  toast('แก้ไขแล้ว · 已改为 ' + name);
+}
+
+function deletePerson(kind, idx){
+  if (kind === 'winner'){
+    toast('ลบผู้ได้รางวัลไม่ได้ · 已中奖的不能删,请先「撤销上一轮」或「重置」');
+    return;
+  }
+  var p = S.pool[idx];
+  if (!p) return;
+  if (!confirm('ลบออกจากรายชื่อ?  从名单里删除?\n\n' +
+               p.name + (p.sub ? '(' + p.sub + ')' : '') +
+               '\n\n他不再参与后面的抽奖。已经开出的结果不受影响。')) return;
+  S.pool.splice(idx, 1);
+  autosave();
+  renderPoolList(); renderRail(); updateControls();
+  toast('ลบแล้ว · 已删除 ' + p.name);
+}
+
 /* ---------- winners ---------- */
 function renderWinners(){
   var w = $('#wlist'); w.innerHTML = '';
@@ -1693,7 +1813,7 @@ $('#bFull').onclick = function(){
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen().catch(function(){});
 };
-$('#bNames').onclick = function(){ $('#vNames').classList.add('on'); };
+$('#bNames').onclick = function(){ renderPoolList(); $('#vNames').classList.add('on'); };
 $('#bTiers').onclick = function(){ renderTierRows(); $('#vTiers').classList.add('on'); };
 $('#bWinners').onclick = function(){ renderWinners(); $('#vWinners').classList.add('on'); };
 document.querySelectorAll('[data-close]').forEach(function(b){

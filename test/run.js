@@ -8,6 +8,7 @@ const { buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf } =
 
 const SUITES = {
   draw: require('./draw.test.js'),
+  roster: require('./roster.test.js'),
   pdf: require('./pdf.test.js'),
   storage: require('./storage.test.js'),
 };

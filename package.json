@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node test/run.js",
     "test:draw": "node test/run.js draw",
+    "test:roster": "node test/run.js roster",
     "test:pdf": "node test/run.js pdf",
     "test:storage": "node test/run.js storage"
   },
