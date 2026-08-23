@@ -30,6 +30,7 @@
   --bone:#EFE8E0;
   --pour:#FF8A1F;
   --whitehot:#FFE9C4;
+  --warn:#E2645A;
   --steel-hi:#DDE2E6;
   --steel-lo:#9AA2A9;
 
@@ -318,6 +319,26 @@ input,select{font:inherit;color:inherit}
 }
 .sub-h em{display:block;font-style:normal;font-size:13px;color:var(--ash);letter-spacing:0;margin-top:4px}
 
+/* 名单面板:两个大按钮 + 括号标注的说明 */
+.act{
+  flex:1 1 210px;font-family:var(--f-util);font-size:17px;font-weight:600;letter-spacing:.05em;
+  padding:16px 18px;border-radius:3px;border:1px solid var(--pour);color:var(--pour);
+  background:rgba(255,138,31,.08);transition:.16s;
+}
+.act:hover{background:var(--pour);color:#1A0E03}
+.act:focus-visible{outline:2px solid var(--whitehot);outline-offset:2px}
+.act small{display:block;font-size:13px;font-weight:400;letter-spacing:0;opacity:.8;margin-top:3px}
+.act.danger{border-color:var(--warn);color:var(--warn);background:rgba(226,100,90,.08)}
+.act.danger:hover{background:var(--warn);color:#1A0E03}
+
+.tagline{display:flex;gap:4px;flex-wrap:wrap;align-items:baseline;font-size:16px;color:var(--bone);margin:0}
+.tagline .k{font-family:var(--f-util);font-size:14px;color:var(--pour);font-weight:600;flex:none}
+.notes{display:grid;gap:10px;margin-top:16px;padding-top:15px;border-top:1px dashed var(--line)}
+.note{display:flex;gap:4px;flex-wrap:wrap;align-items:baseline;font-size:14px;line-height:1.7;color:var(--ash)}
+.note .k{font-family:var(--f-util);font-size:13.5px;color:var(--bone);font-weight:600;flex:none}
+.note .v{flex:1 1 240px;min-width:0}
+.note.hi .k{color:var(--pour)}
+
 .drop{
   border:1px dashed var(--line);border-radius:3px;padding:26px;text-align:center;transition:.18s;
 }
@@ -478,17 +499,24 @@ td input{padding:9px 10px;font-size:15px}
     <div class="panel-b">
       <div class="sec">
         <div class="sec-h">รายชื่อปัจจุบัน · 当前名单</div>
-        <p class="hint" style="margin-top:0" id="poolSummary">…</p>
-        <div class="row" style="margin-top:10px">
-          <button class="ghost" id="bAddPerson">+ เพิ่มคน 添加一人</button>
-          <button class="ghost" id="bClearPool" style="margin-left:auto">🗑 ล้างรายชื่อ 清空名单</button>
+        <p class="tagline" id="poolSummary">…</p>
+        <div class="row" style="margin-top:14px">
+          <button class="act" id="bAddPerson">+ เพิ่มคน<small>添加一人</small></button>
+          <button class="act danger" id="bClearPool">🗑 ล้างรายชื่อทั้งหมด<small>清空名单</small></button>
         </div>
-        <p class="hint" style="margin-top:10px">✎ 改名字或工号 · × 从名单里删除。已中奖的(打勾那些)只能改名,
-        要删得先「撤销上一轮」或「重置」。<br>
-        临时来人直接点「添加一人」,不用重新导整份名单。<br>
-        <b style="color:var(--pour)">下次活动重新开始</b>:点「清空名单」一次清掉所有人和中奖结果,
-        奖项设置和 Logo 保留,然后直接导入新名单。</p>
         <div class="plist" id="plist"></div>
+        <div class="notes">
+          <div class="note"><span class="k">【+ เพิ่มคน · 添加一人】</span>
+            <span class="v">เพิ่มทีละคน · 临时来人直接加一个,不用重新导整份名单。</span></div>
+          <div class="note hi"><span class="k">【🗑 ล้างรายชื่อ · 清空名单】</span>
+            <span class="v">ล้างทั้งหมด เริ่มงานใหม่ · 下次活动重新开始时用:一次清掉所有人和中奖结果,
+            奖项设置和 Logo 保留,然后直接导入新名单。</span></div>
+          <div class="note"><span class="k">【✎ แก้ไข · 改名】</span>
+            <span class="v">แก้ชื่อหรือรหัสพนักงาน · 改名字或工号,已中奖的也能改。</span></div>
+          <div class="note"><span class="k">【× ลบ · 删除】</span>
+            <span class="v">ลบออกจากรายชื่อ · 从名单里删除。已中奖的(打勾那些)不能删,
+            要删得先「撤销上一轮」或「重置」。</span></div>
+        </div>
       </div>
 
       <div class="sec">
@@ -646,7 +674,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v21';
+var APP_VERSION = 'v22';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1526,12 +1554,14 @@ function renderPoolList(){
 
   var total = S.pool.length + S.winners.length;
   if (!total){
-    sum.textContent = 'ยังไม่มีรายชื่อ · 还没有导入名单,用下面的方式导入(Excel / CSV / PDF / 直接粘贴)。';
+    sum.innerHTML = '<span class="k">【สถานะ · 状态】</span>' +
+                    '<span>ยังไม่มีรายชื่อ · 还没有导入名单,用下面的方式导入(Excel / CSV / PDF / 直接粘贴)。</span>';
     return;
   }
-  sum.innerHTML = '共 <b style="color:var(--pour)">' + total + '</b> 人 · ' +
+  sum.innerHTML = '<span class="k">【จำนวน · 人数】</span><span>รวม <b style="color:var(--pour)">' +
+                  total + '</b> คน · 共 <b style="color:var(--pour)">' + total + '</b> 人 · ' +
                   S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖' +
-                  (total > PLIST_CAP ? ' · 下面只列出前 ' + PLIST_CAP + ' 条' : '');
+                  (total > PLIST_CAP ? ' · 下面只列出前 ' + PLIST_CAP + ' 条' : '') + '</span>';
 
   /* 待抽的排前面,已中奖的排后面并打勾 */
   var all = S.pool.map(function(p){ return { p:p, won:false }; })
