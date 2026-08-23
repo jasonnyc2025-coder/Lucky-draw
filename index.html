@@ -46,7 +46,13 @@ body{
   font-family:var(--f-display);
   font-weight:400;
   overflow:hidden;
+  overscroll-behavior:none;
   -webkit-tap-highlight-color:transparent;
+}
+/* 手机浏览器的地址栏一收一放,100%/vh 就跟着变,整屏会来回跳。
+   svh = 地址栏露出来时的那个高度,始终是最小的那个,所以地址栏怎么动都不重排。 */
+@supports (height:100svh){
+  html,body{height:100svh}
 }
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -73,6 +79,8 @@ input,select{font:inherit;color:inherit}
 .tally{
   font-family:var(--f-util);font-size:14px;letter-spacing:.1em;color:var(--ash);
   border:1px solid var(--line);border-radius:2px;padding:6px 12px;white-space:nowrap;
+  /* 等宽数字:剩余人数从 10 掉到 9 时宽度不变,顶栏不会因此重新折行 */
+  font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;
 }
 .tally b{color:var(--pour);font-size:17px}
 
@@ -287,11 +295,13 @@ input,select{font:inherit;color:inherit}
   position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.72);
   backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px;
 }
+@supports (height:100svh){ .veil{height:100svh} }
 .veil.on{display:flex}
 .panel{
-  width:100%;max-width:760px;max-height:88vh;overflow-y:auto;
+  width:100%;max-width:760px;max-height:88vh;overflow-y:auto;overscroll-behavior:contain;
   background:var(--shell);border:1px solid var(--line);border-radius:4px;
 }
+@supports (height:100svh){ .panel{max-height:88svh} }
 .panel-h{
   display:flex;align-items:center;gap:12px;padding:18px 22px;
   border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--shell);z-index:2;
@@ -391,7 +401,7 @@ td input{padding:9px 10px;font-size:15px}
 .wgrp-h{font-family:var(--f-util);font-size:14px;letter-spacing:.14em;color:var(--pour);margin-bottom:11px}
 .plist{
   display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,215px),1fr));
-  max-height:320px;overflow-y:auto;margin-top:10px;
+  max-height:320px;overflow-y:auto;overscroll-behavior:contain;margin-top:10px;
 }
 .prow{
   display:flex;align-items:center;gap:4px;
@@ -674,7 +684,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v23';
+var APP_VERSION = 'v24';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2024,6 +2034,7 @@ window.addEventListener('resize', function(){
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(function(){
     if (S.rolling || S.revealing) return;         // 正在转 / 正在逐个揭晓,别插手
+    if (document.querySelector('.veil.on')) return;  // 面板开着,后面看不见,别白重排
     if (allDone()){ renderFinalBoard(); return; } // 总榜:按新尺寸重排并重新缩放
     if (renderShown()) return;                    // 已揭晓的那一屏:重画,不清空
     resetStage();
