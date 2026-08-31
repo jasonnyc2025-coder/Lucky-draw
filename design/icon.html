@@ -2,50 +2,108 @@
 <html><head><meta charset="utf-8"><style>
   html,body{margin:0;background:transparent}
   #box{width:512px;height:512px}
-  #box>svg{display:block;width:100%;height:100%}
-  .v{display:none}
-  .v.on{display:block}
+  /* 注意 #box>svg 带 id,权重比 .v 高 —— 以前写成 display:block 会把 .v 的
+     display:none 盖掉,两个变体同时排下来,截图永远截到第一个(std),
+     导出的 maskable 其实和 std 一模一样。选择器必须一样具体。 */
+  #box>svg{width:100%;height:100%}
+  #box>svg.v{display:none}
+  #box>svg.v.on{display:block}
 </style></head>
 <body>
 <div id="box">
+
+<!-- 图形本体:转盘 + 指针。std 和 msk 共用,只是缩放不同。 -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg"><defs>
+  <g id="wheel">
+    <!-- 外圈:奶油色轮盘边,上面一圈金色灯泡 -->
+    <circle cx="256" cy="256" r="196" fill="#B3200E"/>
+    <circle cx="256" cy="256" r="188" fill="#FFF4DF"/>
+    <circle cx="301.6" cy="86" r="7" fill="#FFB43A"/>
+    <circle cx="380.5" cy="131.5" r="7" fill="#FFB43A"/>
+    <circle cx="426" cy="210.4" r="7" fill="#FFB43A"/>
+    <circle cx="426" cy="301.6" r="7" fill="#FFB43A"/>
+    <circle cx="380.5" cy="380.5" r="7" fill="#FFB43A"/>
+    <circle cx="301.6" cy="426" r="7" fill="#FFB43A"/>
+    <circle cx="210.4" cy="426" r="7" fill="#FFB43A"/>
+    <circle cx="131.5" cy="380.5" r="7" fill="#FFB43A"/>
+    <circle cx="86" cy="301.6" r="7" fill="#FFB43A"/>
+    <circle cx="86" cy="210.4" r="7" fill="#FFB43A"/>
+    <circle cx="131.5" cy="131.5" r="7" fill="#FFB43A"/>
+    <circle cx="210.4" cy="86" r="7" fill="#FFB43A"/>
+    <circle cx="256" cy="256" r="163" fill="#B3200E"/>
+    <!-- 扇形:整体转 15°,指针正好指在一格中间而不是压在分隔线上 -->
+    <g transform="rotate(45 256 256)">
+    <path d="M256 256 L256 98 A158 158 0 0 1 335 119.2 Z" fill="#E23B22"/>
+    <path d="M256 256 L335 119.2 A158 158 0 0 1 392.8 177 Z" fill="#FFD35C"/>
+    <path d="M256 256 L392.8 177 A158 158 0 0 1 414 256 Z" fill="#E23B22"/>
+    <path d="M256 256 L414 256 A158 158 0 0 1 392.8 335 Z" fill="#FFD35C"/>
+    <path d="M256 256 L392.8 335 A158 158 0 0 1 335 392.8 Z" fill="#E23B22"/>
+    <path d="M256 256 L335 392.8 A158 158 0 0 1 256 414 Z" fill="#FFD35C"/>
+    <path d="M256 256 L256 414 A158 158 0 0 1 177 392.8 Z" fill="#E23B22"/>
+    <path d="M256 256 L177 392.8 A158 158 0 0 1 119.2 335 Z" fill="#FFD35C"/>
+    <path d="M256 256 L119.2 335 A158 158 0 0 1 98 256 Z" fill="#E23B22"/>
+    <path d="M256 256 L98 256 A158 158 0 0 1 119.2 177 Z" fill="#FFD35C"/>
+    <path d="M256 256 L119.2 177 A158 158 0 0 1 177 119.2 Z" fill="#E23B22"/>
+    <path d="M256 256 L177 119.2 A158 158 0 0 1 256 98 Z" fill="#FFD35C"/>
+    <!-- 分隔线 -->
+    <path d="M256 256 L256 98" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L335 119.2" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L392.8 177" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L414 256" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L392.8 335" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L335 392.8" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L256 414" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L177 392.8" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L119.2 335" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L98 256" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L119.2 177" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <path d="M256 256 L177 119.2" stroke="#FFF6E2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    </g>
+    <!-- 中心轴 -->
+    <circle cx="256" cy="256" r="52" fill="#FFF4DF"/>
+    <circle cx="256" cy="256" r="40" fill="#FFB43A"/>
+    <circle cx="256" cy="256" r="15" fill="#B3200E"/>
+  </g>
+  <g id="pointer">
+    <!-- 顶上的指针,压在轮盘边上,尖头朝下 -->
+    <path d="M256 146 L220 44 A36 36 0 0 1 292 44 Z" fill="#B3200E"/>
+    <path d="M256 132 L230 51 A26 26 0 0 1 282 51 Z" fill="#FFF4DF"/>
+  </g>
+</defs></svg>
 
 <!-- 标准图标:铺满整个方形 -->
 <svg class="v on" id="std" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="sBg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFB047"/><stop offset="50%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
+      <stop offset="0" stop-color="#FFB047"/><stop offset="52%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
     </linearGradient>
-    <radialGradient id="sHalo" cx="50%" cy="46%" r="52%">
-      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".55"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
+    <radialGradient id="sHalo" cx="50%" cy="50%" r="56%">
+      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".5"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" fill="url(#sBg)"/>
-  <circle cx="256" cy="236" r="200" fill="url(#sHalo)"/>
-  <path d="M256 74 C272 176 300 210 402 236 C300 262 272 296 256 398 C240 296 212 262 110 236 C212 210 240 176 256 74 Z"
-        fill="#FFFCF4"/>
-  <path d="M388 330 C395 372 407 386 448 394 C407 402 395 416 388 458 C381 416 369 402 328 394 C369 386 381 372 388 330 Z"
-        fill="#FFF3D6" opacity=".95"/>
+  <circle cx="256" cy="256" r="230" fill="url(#sHalo)"/>
+  <g transform="translate(256 268) scale(0.9) translate(-256 -256)">
+    <use href="#wheel"/><use href="#pointer"/>
+  </g>
 </svg>
 
 <!-- maskable:系统会把图标裁成圆形/水滴等各种形状,
      所有内容必须落在中心 80% 直径的安全圆内(半径 204.8),
-     所以图形整体缩到 74% 并居中,背景仍然铺满。 -->
+     指针顶端离中心最远(约 234),所以整体缩到 0.8 并居中,背景仍然铺满。 -->
 <svg class="v" id="msk" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="mBg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFB047"/><stop offset="50%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
+      <stop offset="0" stop-color="#FFB047"/><stop offset="52%" stop-color="#FF8A1F"/><stop offset="100%" stop-color="#D9500A"/>
     </linearGradient>
-    <radialGradient id="mHalo" cx="50%" cy="48%" r="46%">
-      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".55"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
+    <radialGradient id="mHalo" cx="50%" cy="50%" r="46%">
+      <stop offset="0" stop-color="#FFF6E2" stop-opacity=".5"/><stop offset="100%" stop-color="#FFF6E2" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" fill="url(#mBg)"/>
-  <circle cx="256" cy="248" r="170" fill="url(#mHalo)"/>
-  <g transform="translate(256 256) scale(0.74) translate(-256 -248)">
-    <path d="M256 74 C272 176 300 210 402 236 C300 262 272 296 256 398 C240 296 212 262 110 236 C212 210 240 176 256 74 Z"
-          fill="#FFFCF4"/>
-    <path d="M388 330 C395 372 407 386 448 394 C407 402 395 416 388 458 C381 416 369 402 328 394 C369 386 381 372 388 330 Z"
-          fill="#FFF3D6" opacity=".95"/>
+  <circle cx="256" cy="256" r="190" fill="url(#mHalo)"/>
+  <g transform="translate(256 268) scale(0.8) translate(-256 -256)">
+    <use href="#wheel"/><use href="#pointer"/>
   </g>
 </svg>
 
