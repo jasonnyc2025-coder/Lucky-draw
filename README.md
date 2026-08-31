@@ -47,6 +47,13 @@ npm test
 两处填的值不一样时,「设置 → 版本」那行会直接显示 `⚠ 离线缓存还是 vX`,
 一眼就知道用户手上是不是旧缓存。
 
+**换了图标还要再加一个**:图标 URL 后面的 `?r=N`,在 `index.html` 的 `<link>`、
+`manifest.webmanifest` 的 `icons[].src`、`sw.js` 的 `ICON_REV` 三处,必须一起加一
+且保持一致。浏览器是按 URL 缓存图标的 —— 尤其标签页上那个 favicon,同一个 URL
+换了内容它未必会去重新拿。细节见 `design/README.md`。
+
+`npm run test:assets` 会把上面这些全部核对一遍,不开浏览器,一秒出结果。
+
 ## 使用要点
 
 - 抽奖顺序 = 奖项列表由上到下,最后一项压轴。前面没抽完后面锁住。

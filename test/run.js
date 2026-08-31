@@ -11,6 +11,7 @@ const SUITES = {
   roster: require('./roster.test.js'),
   pdf: require('./pdf.test.js'),
   storage: require('./storage.test.js'),
+  assets: require('./assets.test.js'),
 };
 
 (async () => {

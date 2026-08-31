@@ -19,8 +19,16 @@ node design/make-icons.js
 会覆盖仓库根目录的 5 个 PNG:`icon-512` / `icon-192` / `apple-touch-icon` /
 `favicon-64` / `icon-maskable-512`。
 
-生成完**必须**把 `index.html` 的 `APP_VERSION` 和 `sw.js` 的 `VERSION` 一起加一,
-否则图标被 Service Worker 缓存着,用户看到的还是旧的。
+生成完**必须**改三个地方,少一个用户就还是看到旧图标:
+
+1. `index.html` 的 `APP_VERSION` 和 `sw.js` 的 `VERSION` 一起加一 —— 否则整个 Service
+   Worker 缓存不会换代
+2. **图标改版号 `?r=N` 加一**,三处同时改:`index.html` 的三个 `<link>`、
+   `manifest.webmanifest` 的 `icons[].src`、`sw.js` 的 `ICON_REV`。
+   浏览器(尤其是标签页上那个 favicon)是按 **URL** 缓存图标的,同一个 URL 换了
+   内容它未必会去重新拿;换了 URL 才一定会。三处必须一致,否则 SW 缓存的地址
+   和页面请求的地址对不上,离线时图标拿不到
+3. `npm run test:assets` 跑一遍,上面这些它都会替你核对
 
 > 已经装到手机桌面的 PWA,换图标后系统未必会刷新桌面上那个图标 ——
 > 通常要把它从桌面删掉、重新「添加到主屏幕」才会变。

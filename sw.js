@@ -1,25 +1,31 @@
 /* จับรางวัล · 抽奖 — service worker
    改动这个文件时把 VERSION 加一,用户下次打开会收到更新提示。 */
-const VERSION = 'v25';
+const VERSION = 'v26';
 const CORE = 'draw-core-' + VERSION;
 const RUNTIME = 'draw-runtime-' + VERSION;
+
+/* 图标改版号,必须和 index.html、manifest.webmanifest 里的 ?r= 保持一致。
+   页面请求的是带 ?r= 的地址,这里不带的话缓存里那份永远命中不了。 */
+const ICON_REV = '?r=2';
 
 /* 本体文件:安装时全部抓下来,之后完全离线可用 */
 const CORE_FILES = [
   './',
   './index.html',
-  './manifest.webmanifest',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-maskable-512.png',
-  './apple-touch-icon.png',
-  './favicon-64.png'
+  './manifest.webmanifest' + ICON_REV,
+  './icon-192.png' + ICON_REV,
+  './icon-512.png' + ICON_REV,
+  './icon-maskable-512.png' + ICON_REV,
+  './apple-touch-icon.png' + ICON_REV,
+  './favicon-64.png' + ICON_REV
 ];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CORE)
-      .then((c) => c.addAll(CORE_FILES))
+      /* cache:'reload' 绕开浏览器自己的 HTTP 缓存。不加的话装新版 SW 时
+         很可能把 HTTP 缓存里的旧图标原样塞进新缓存,版本号加了也没用。 */
+      .then((c) => c.addAll(CORE_FILES.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });

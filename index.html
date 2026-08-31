@@ -4,11 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>จับรางวัล · 抽奖</title>
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest.webmanifest?r=2">
 <meta name="theme-color" content="#221C19">
 <meta name="description" content="ระบบจับรางวัลสองภาษา ไทย-จีน · 泰中双语抽奖系统">
-<link rel="icon" href="./favicon-64.png" sizes="64x64" type="image/png">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<!-- 图标 URL 后面的 ?r=N 是图标改版号:浏览器(尤其是标签页那个 favicon)会按
+     URL 缓存图标,同一个 URL 换了内容它未必去重新拿。换图标时把 index.html、
+     manifest.webmanifest、sw.js 里的 ?r= 一起加一,才会真的换过来。 -->
+<link rel="icon" href="./favicon-64.png?r=2" sizes="64x64" type="image/png">
+<link rel="icon" href="./icon-192.png?r=2" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png?r=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -684,7 +688,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v25';
+var APP_VERSION = 'v26';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 

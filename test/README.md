@@ -17,11 +17,12 @@ npm run test:draw       # 抽奖全流程
 npm run test:roster     # 名单增删改
 npm run test:pdf        # PDF 导入
 npm run test:storage    # 本机存档
+npm run test:assets     # 版本号和图标(不开浏览器,秒出)
 ```
 
 全部通过时退出码 0,有失败是 1,可以直接接 CI。
 
-## 四个套件
+## 五个套件
 
 | 文件 | 覆盖 |
 |---|---|
@@ -29,6 +30,7 @@ npm run test:storage    # 本机存档
 | `roster.test.js` | 名单面板:看当前名单、加人、改名、删人、一键清空、中奖者只能改不能删、改动存进本机 |
 | `pdf.test.js` | PDF 导入:按文字坐标还原行列、跨页重复表头去重、扫描件的错误提示 |
 | `storage.test.js` | 自动存档、**真的关掉页面重新打开**后名单/Logo/奖项/中奖记录是否都在、自动保存开关、清除本机数据 |
+| `assets.test.js` | 不开浏览器,纯读文件:两个版本号是否一起加了、图标 `?r=` 三处是否一致、引用到的图标是否都在、maskable 和标准图是否真的是两张 |
 
 ## 关于 PDF 测试
 
@@ -59,6 +61,8 @@ PDF 格式本身的局限。所以断言是分层的:
 - 抽出重复的人 / 中奖者没从待抽池移除
 - 导出的 CSV 少了 BOM,Excel 打开中文乱码
 - 关掉页面重开丢数据
+- 改了图标但 `?r=` 忘了加一(浏览器按 URL 缓存 favicon,标签页上还是旧图)
+- `APP_VERSION` 和 `sw.js` 的 `VERSION` 只改了一个
 
 ## 没覆盖的
 

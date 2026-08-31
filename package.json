@@ -8,7 +8,8 @@
     "test:draw": "node test/run.js draw",
     "test:roster": "node test/run.js roster",
     "test:pdf": "node test/run.js pdf",
-    "test:storage": "node test/run.js storage"
+    "test:storage": "node test/run.js storage",
+    "test:assets": "node test/run.js assets"
   },
   "devDependencies": {
     "@fontsource/noto-sans-thai": "^5.3.0",
