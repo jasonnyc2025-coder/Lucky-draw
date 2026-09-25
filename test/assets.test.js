@@ -65,5 +65,9 @@ module.exports = async function run(){
   R.check("SW 安装时用 cache:'reload' 抓资源,不会把旧图标塞进新缓存",
           /cache:\s*'reload'/.test(sw));
 
+  // ---------- 7. 别让浏览器自动翻译 ----------
+  R.check('页面标了 translate="no" / notranslate,浏览器不会把双语界面翻乱',
+          /<html[^>]+translate="no"/.test(html) && /name="google"\s+content="notranslate"/.test(html));
+
   return R;
 };

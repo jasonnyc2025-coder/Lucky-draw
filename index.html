@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,6 +7,10 @@
 <link rel="manifest" href="./manifest.webmanifest?r=2">
 <meta name="theme-color" content="#221C19">
 <meta name="description" content="ระบบจับรางวัลสองภาษา ไทย-จีน · 泰中双语抽奖系统">
+<!-- 界面本来就是泰文 + 中文双语。Chrome 看到 lang="th" 会自动翻成手机系统语言,
+     把中文那半也一并重写(「PDF 只能读出文字版的内容」会变成一串乱七八糟的
+     PDF documents),而且它不停地改 DOM,后面的界面会一闪一闪。全部关掉。 -->
+<meta name="google" content="notranslate">
 <!-- 图标 URL 后面的 ?r=N 是图标改版号:浏览器(尤其是标签页那个 favicon)会按
      URL 缓存图标,同一个 URL 换了内容它未必去重新拿。换图标时把 index.html、
      manifest.webmanifest、sw.js 里的 ?r= 一起加一,才会真的换过来。 -->
@@ -296,8 +300,13 @@ input,select{font:inherit;color:inherit}
 
 /* ---------- drawer / modal ---------- */
 .veil{
-  position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.72);
-  backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px;
+  position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.9);
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+/* 毛玻璃只在宽屏上开。手机 GPU 做 backdrop-filter 很吃力,后面内容一有变动
+   就得整屏重新模糊一遍,会看到背景一闪一闪;窄屏改用更不透明的纯色遮罩。 */
+@media (min-width:821px){
+  .veil{background:rgba(16,12,10,.72);backdrop-filter:blur(3px)}
 }
 @supports (height:100svh){ .veil{height:100svh} }
 .veil.on{display:flex}
@@ -688,7 +697,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v26';
+var APP_VERSION = 'v27';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
