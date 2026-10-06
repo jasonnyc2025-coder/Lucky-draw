@@ -822,7 +822,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v32';
+var APP_VERSION = 'v33';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1597,6 +1597,25 @@ function joinCols(row, roles, want){
   }
   return parts.join(' ');
 }
+/* 按表头猜这一列派什么用。返回 'name' / 'sub' / ''(不用),认不出来返回 null。
+   顺序很重要:部门、职位这类先排掉 —— 「ชื่อแผนก(部门名称)」里也有「ชื่อ」,
+   先匹配姓名的话会把部门当成名字拼进去。 */
+var COL_HINTS = [
+  /* 不用:部门、职位、分厂这些,放进名字里只会把卡片撑爆 */
+  { role: '', re: /แผนก|ฝ่าย|ตำแหน่ง|หน่วยงาน|สังกัด|โรงงาน|กะ|部门|部門|科室|车间|班组|职位|岗位|职务|\b(dept|department|division|section|position|team|branch|unit|shift)\b/i },
+  /* 副信息:工号、员工编号、卡号 */
+  { role: 'sub', re: /รหัส|เลขที่|เลขประจำ|พนักงาน|工号|員工|员工编号|编号|工号|卡号|学号|\b(id|code|emp|employee|staff|no)\b\.?/i },
+  /* 姓名:称谓、名、姓 —— 这几列都要,拼起来才是完整的人名 */
+  { role: 'name', re: /ชื่อ|นามสกุล|คำนำหน้า|สกุล|姓名|名字|姓氏|称谓|稱謂|\b(name|surname|firstname|lastname|fullname|given|family|title|prefix)\b/i }
+];
+function guessByHeader(head){
+  var h = String(head || '').trim();
+  if (!h) return null;
+  for (var i = 0; i < COL_HINTS.length; i++){
+    if (COL_HINTS[i].re.test(h)) return COL_HINTS[i].role;
+  }
+  return null;
+}
 function loadRows(rows){
   if (!rows.length){ toast('ไฟล์ว่าง · 文件里没有数据'); return; }
   S.fileRows = rows;
@@ -1604,7 +1623,7 @@ function loadRows(rows){
   var box = $('#cols');
   box.innerHTML = '';
 
-  /* 猜一个默认:看起来像工号的(纯数字/字母数字)给副信息,其余给姓名。
+  /* 猜一个默认。先看表头写的是什么(最准),表头认不出来再看这一列的内容长什么样。
      猜错了也没关系 —— 下面的卡片预览会把结果直接摆出来。 */
   var body = rows.slice(1, 6);
   for (var i = 0; i < width; i++){
@@ -1612,6 +1631,7 @@ function loadRows(rows){
     var samples = body.map(function(r){ return String(r[i] == null ? '' : r[i]).trim(); })
                       .filter(Boolean);
     var idLike = samples.length && samples.every(function(v){ return /^[A-Za-z0-9\-_/]{2,}$/.test(v); });
+    var byHead = guessByHeader(head);
 
     var row = el('div','colrow');
     var info = el('div','ch');
@@ -1624,7 +1644,7 @@ function loadRows(rows){
     sel.appendChild(new Option('— 不用 —', ''));
     sel.appendChild(new Option('姓名 ชื่อ', 'name'));
     sel.appendChild(new Option('副信息 工号/部门', 'sub'));
-    sel.value = idLike ? 'sub' : 'name';
+    sel.value = byHead !== null ? byHead : (idLike ? 'sub' : 'name');
     row.appendChild(sel);
     box.appendChild(row);
   }

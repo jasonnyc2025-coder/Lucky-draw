@@ -5,6 +5,15 @@
 
 const { reporter, chromium } = require('./lib/harness');
 
+/* 现场那份真名单的表头(工号 / 称谓 / 名 / 姓 / 部门)。
+   部门那列必须被排除 —— 拼进名字里会变成「นาย อร่าม จันพางาม ตะกั่วอัลลอย-โรง2」。 */
+const REAL = [
+  ['รหัสพนักงาน', 'คำนำหน้า', 'ชื่อ(ไทย)', 'นามสกุล(ไทย)', 'แผนก'],
+  ['01018', 'นาย', 'อร่าม', 'จันพางาม', 'ตะกั่วอัลลอย-โรง2'],
+  ['01027', 'นาย', 'จำปี', 'ภูเลาสิงห์', 'ตะกั่วเตาตะลง'],
+  ['10007', 'นางสาว', 'ศรมณี', 'หงษ์ทอง', 'เตรียมวัตถุดิบ'],
+];
+
 /* 模拟泰文名单常见的排法:工号、称谓、名、姓 分成四列 */
 const HEAD = ['รหัส 工号', 'คำนำหน้า 称谓', 'ชื่อ 名', 'นามสกุล 姓'];
 const GIVEN = ['สมชาย', 'ณัฐพล', '王小美', '李明华', 'Vincent', 'อารีย์', '张敏', 'John'];
@@ -64,6 +73,34 @@ module.exports = async function run({ url }) {
     const pool = await page.evaluate(() => S.pool.slice(0, 2).map(x => x.name + '|' + x.sub));
     R.check('导进去的就是完整姓名 + 工号',
             pool[0] === 'นางสาว สมชาย ใจดี|15000', JSON.stringify(pool));
+
+    // ---------- 1.5 按表头认列(现场那份真名单) ----------
+    await page.click('#bNames'); await page.waitForTimeout(250);
+    await page.evaluate(rows => { S.fromPdf = false; loadRows(rows); }, REAL);
+    await page.waitForTimeout(400);
+    const real = await page.evaluate(() => colRoles());
+    R.check('看表头就能认出工号列(รหัสพนักงาน → 副信息)', real[0] === 'sub', JSON.stringify(real));
+    R.check('称谓 / 名 / 姓 三列都认成姓名',
+            real[1] === 'name' && real[2] === 'name' && real[3] === 'name', JSON.stringify(real));
+    R.check('部门列(แผนก)默认不用,不会被拼进名字里',
+            real[4] === '', 'แผนก → ' + JSON.stringify(real[4]));
+    const realDemo = await page.evaluate(() => ({
+      n: document.querySelector('#mapDemo b').textContent,
+      s: (document.querySelector('#mapDemo span') || {}).textContent || '',
+    }));
+    R.check('这份表直接导进去就是「称谓 名 姓」+ 工号,不用手动调',
+            realDemo.n === 'นาย อร่าม จันพางาม' && realDemo.s === '01018',
+            JSON.stringify(realDemo));
+
+    // 换回四列那份继续后面的流程
+    await page.evaluate(rows => { S.fromPdf = false; loadRows(rows); }, ROWS);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const s = [...document.querySelectorAll('#cols select')];
+      s[0].value = 'sub'; s[1].value = 'name'; s[2].value = 'name'; s[3].value = 'name';
+      previewMap();
+    });
+    await page.click('#bApplyFile'); await page.waitForTimeout(500);
 
     // ---------- 2. 抽完 → 总榜上是名字,不是工号 ----------
     await page.evaluate(() => {
