@@ -1,6 +1,6 @@
 /* จับรางวัล · 抽奖 — service worker
    改动这个文件时把 VERSION 加一,用户下次打开会收到更新提示。 */
-const VERSION = 'v30';
+const VERSION = 'v31';
 const CORE = 'draw-core-' + VERSION;
 const RUNTIME = 'draw-runtime-' + VERSION;
 
@@ -26,8 +26,14 @@ self.addEventListener('install', (e) => {
       /* cache:'reload' 绕开浏览器自己的 HTTP 缓存。不加的话装新版 SW 时
          很可能把 HTTP 缓存里的旧图标原样塞进新缓存,版本号加了也没用。 */
       .then((c) => c.addAll(CORE_FILES.map((u) => new Request(u, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
   );
+  /* 这里**不要**调 self.skipWaiting()。
+     调了的话新版本装完就立刻接管并刷新页面,页面那边「正在抽奖 / 面板开着 /
+     粘贴框里有没提交的名单就别刷新」的判断根本来不及生效 —— 实测会在抽奖
+     滚动中途把页面刷掉。现在新版本老老实实等着,由页面决定什么时候换:
+     刚打开且空闲就自动换,活动当中只亮一个「有新版本」按钮。
+     页面通过下面的 message('skip-waiting') 来发话。
+     注意:第一次安装时没有正在跑的旧版本,不存在等待态,照样会直接激活。 */
 });
 
 self.addEventListener('activate', (e) => {

@@ -69,5 +69,18 @@ module.exports = async function run(){
   R.check('页面标了 translate="no" / notranslate,浏览器不会把双语界面翻乱',
           /<html[^>]+translate="no"/.test(html) && /name="google"\s+content="notranslate"/.test(html));
 
+  // ---------- 8. sw.js 不许在 install 里 skipWaiting ----------
+  /* 真踩过:install 里调了 skipWaiting,新版本装完就立刻接管并刷新页面,
+     页面那边「正在抽奖就别刷新」的判断根本来不及生效 —— 抽奖滚到一半被刷掉。
+     现在新版本必须等页面发话(message 'skip-waiting')。 */
+  const installBlock = sw.slice(sw.indexOf("addEventListener('install'"),
+                                sw.indexOf("addEventListener('activate'"))
+    .replace(/\/\*[\s\S]*?\*\//g, '')      // 注释里会提到 skipWaiting,先去掉
+    .replace(/\/\/[^\n]*/g, '');
+  R.check('sw.js 的 install 里没有 skipWaiting(不然活动中会被强制刷新)',
+          !/skipWaiting/.test(installBlock), installBlock.replace(/\s+/g,' ').trim().slice(0,90));
+  R.check('页面可以通过 message 让新版本接管',
+          /'skip-waiting'/.test(sw) && /skipWaiting/.test(sw));
+
   return R;
 };

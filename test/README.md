@@ -21,11 +21,12 @@ npm run test:assets     # 版本号和图标(不开浏览器,秒出)
 npm run test:audio      # 音效
 npm run test:edge       # 边角情况
 npm run test:theme      # 配色和 Logo
+npm run test:update     # 自动更新
 ```
 
 全部通过时退出码 0,有失败是 1,可以直接接 CI。
 
-## 八个套件
+## 九个套件
 
 | 文件 | 覆盖 |
 |---|---|
@@ -37,6 +38,7 @@ npm run test:theme      # 配色和 Logo
 | `audio.test.js` | 合成器里有没有混进 square / sawtooth、主输出的柔化链在不在、连抽三轮后振荡器和定时器有没有收干净 |
 | `edge.test.js` | 名额比人多、只剩一个人、猛点按钮、连按空格、导入时的重复行 |
 | `theme.test.js` | 三套配色的对比度(每一组都要 ≥ 7:1)、切换后状态栏颜色、Logo 一键换、大图自动缩、关掉页面重开还在 |
+| `update.test.js` | **真的在临时目录里改 sw.js 造一个新版本**,看打开后会不会自动换过去;以及抽奖中、面板开着时绝不自动刷新 |
 
 ## 关于 PDF 测试
 
@@ -71,6 +73,7 @@ PDF 格式本身的局限。所以断言是分层的:
 - `APP_VERSION` 和 `sw.js` 的 `VERSION` 只改了一个
 - 导入时同一个人出现两次没去掉(他的中奖概率就成了别人的两倍)
 - 抽完一轮振荡器没停,抽几轮之后声音越叠越吵
+- `sw.js` 的 install 里调 `skipWaiting()` —— 新版本会在抽奖中途把页面强制刷掉
 
 ## 没覆盖的
 

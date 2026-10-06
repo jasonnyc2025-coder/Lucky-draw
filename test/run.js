@@ -15,6 +15,7 @@ const SUITES = {
   audio: require('./audio.test.js'),
   edge: require('./edge.test.js'),
   theme: require('./theme.test.js'),
+  update: require('./update.test.js'),
 };
 
 (async () => {

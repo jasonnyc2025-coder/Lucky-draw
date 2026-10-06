@@ -694,7 +694,13 @@ td input{padding:9px 10px;font-size:15px}
           <button class="ghost" id="bCheckUpd">ตรวจหาอัปเดต 检查更新</button>
           <span class="hint" style="margin:0" id="swNote">กำลังตรวจสอบ… 检查中…</span>
         </div>
-        <p class="hint">安装后可脱离浏览器独立运行,断网也能用。<br>
+        <p class="hint"><b style="color:var(--pour)">更新是自动的</b> ——
+        打开 App 的头一分半钟里如果发现新版本,会直接装上并自动刷新,你什么都不用点,
+        完成后左下角会提示「已更新到 vXX」。<br>
+        <b>活动当中绝不会自己刷新</b>:正在抽奖、正在揭晓、面板开着、粘贴框里有没提交的名单,
+        这几种情况一律跳过,只把上面的「有新版本」按钮亮出来,等你抽完自己点。<br>
+        「检查更新」是手动再问一次,平时用不着。<br><br>
+        安装后可脱离浏览器独立运行,断网也能用。<br>
         <b>Android / Chrome</b>:点上面的按钮,或浏览器菜单「添加到主屏幕」。<br>
         <b>iPhone / iPad</b>:Safari 打开 → 分享按钮 → 「添加到主屏幕」。<br>
         <b>Windows / Mac</b>:Chrome 或 Edge 地址栏右侧的安装图标。</p>
@@ -785,7 +791,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v30';
+var APP_VERSION = 'v31';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2340,6 +2346,39 @@ bootRestore();
   var deferred = null;
   var note = $('#swNote');
 
+  /* 打开页面后这段时间内发现的新版本,直接自动装上并刷新。
+     之后再发现的,说明活动多半已经开始了,就只提示不打断。 */
+  var AUTO_WINDOW = 90 * 1000;
+  var JUST_UPDATED = 'lucky-draw.justUpdated';
+  var openedAt = Date.now();
+  var refreshing = false;
+  /* 首次装 Service Worker 时 controllerchange 也会触发,那次不能刷新 */
+  var hadController = !!navigator.serviceWorker && !!navigator.serviceWorker.controller;
+
+  function safeToUpdate(){
+    if (S.rolling || S.revealing) return false;              // 正在抽 / 正在揭晓
+    if (document.querySelector('.veil.on')) return false;    // 面板开着,可能正在粘名单
+    var pa = $('#paste');
+    if (pa && pa.value.trim()) return false;                 // 粘贴框里有没提交的内容
+    return true;
+  }
+  function reloadOnce(){
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  }
+
+  /* 更新完重开之后给一句话,否则用户只看到屏幕闪了一下不知道发生了什么 */
+  try {
+    var was = sessionStorage.getItem(JUST_UPDATED);
+    if (was){
+      sessionStorage.removeItem(JUST_UPDATED);
+      setTimeout(function(){
+        toast('อัปเดตแล้ว · 已更新到 ' + APP_VERSION + (was === APP_VERSION ? '' : '(原 ' + was + ')'));
+      }, 700);
+    }
+  } catch(e){}
+
   function setNote(txt){ if (note) note.textContent = txt; }
   function showInstall(on){
     $('#bInstall').style.display  = on ? '' : 'none';
@@ -2388,6 +2427,17 @@ bootRestore();
   navigator.serviceWorker.addEventListener('message', function(e){
     if (e.data && e.data.type === 'sw-version'){ swVersion = e.data.version; renderVersion(); }
   });
+  /* 新版本接管的那一刻刷新。hadController 用来排除「第一次装 SW」那一次 ——
+     那次不刷,否则每个第一次打开的人都会莫名其妙重载一下。 */
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (!hadController){
+      /* 第一次装好、刚接管:不刷新,只把版本号问出来,
+         不然「设置 → 版本」要等到下次打开才显示离线缓存的版本。 */
+      askVersion();
+      return;
+    }
+    reloadOnce();
+  });
   function askVersion(){
     var c = navigator.serviceWorker.controller;
     if (c) c.postMessage('version');
@@ -2410,21 +2460,52 @@ bootRestore();
     if (standalone) setNote('พร้อมใช้ออฟไลน์ · 已安装,可离线使用');
     else setNote(navigator.onLine ? 'พร้อมใช้ออฟไลน์ · 离线可用已就绪' : 'ออฟไลน์ · 当前离线,正常运行');
 
+    /* ---- 发现新版本之后怎么办 ----
+       刚打开页面那会儿:直接自动换,用户什么都不用点。
+       活动已经开始之后(超过 AUTO_WINDOW,或者正在抽、面板开着):绝不自动刷新,
+       只把「有新版本」的按钮亮出来,等他自己挑时间点。
+       中途刷新的代价太大 —— 名单虽然存在本机能恢复,但正在粘贴的名单会没、
+       滚动会断、投影上会黑一下。 */
+    function onWaiting(w){
+      /* 必须用 hadController(页面加载那一刻有没有被 SW 接管),不能用当前的
+         navigator.serviceWorker.controller —— 第一次装 SW 时 clients.claim() 会
+         让 controller 当场变成非空,于是「第一次打开」被误判成「有新版本」,
+         页面白白自己刷新一次。 */
+      if (!w || !hadController) return;
+
+      if (Date.now() - openedAt < AUTO_WINDOW && safeToUpdate()){
+        toast('พบเวอร์ชันใหม่ กำลังอัปเดต · 发现新版本,正在自动更新…');
+        try { sessionStorage.setItem(JUST_UPDATED, APP_VERSION); } catch(e){}
+        w.postMessage('skip-waiting');
+        /* 正常是 controllerchange 来了就刷新;万一没来(浏览器实现差异),
+           兜底在 2.5 秒后自己刷。 */
+        setTimeout(reloadOnce, 2500);
+        return;
+      }
+
+      $('#bUpdate').style.display = '';
+      $('#bUpdate').onclick = function(){
+        toast('กำลังอัปเดต · 正在更新…');
+        try { sessionStorage.setItem(JUST_UPDATED, APP_VERSION); } catch(e){}
+        w.postMessage('skip-waiting');
+        setTimeout(reloadOnce, 900);
+      };
+      toast('มีเวอร์ชันใหม่ · 有新版本。活动当中不会自动刷新,抽完到「设置」点一下更新');
+    }
     function watch(w){
       if (!w) return;
+      /* 已经是 installed 的 worker 不会再触发 statechange —— 原来只挂监听,
+         结果页面一打开就有待装版本时,按钮亮着但点了没反应。 */
+      if (w.state === 'installed'){ onWaiting(w); return; }
       w.addEventListener('statechange', function(){
-        if (w.state === 'installed' && navigator.serviceWorker.controller){
-          $('#bUpdate').style.display = '';
-          $('#bUpdate').onclick = function(){
-            w.postMessage('skip-waiting');
-            setTimeout(function(){ location.reload(); }, 250);
-          };
-          toast('มีเวอร์ชันใหม่ · 有新版本,可在设置里更新');
-        }
+        if (w.state === 'installed') onWaiting(w);
       });
     }
-    if (reg.waiting){ watch(reg.waiting); $('#bUpdate').style.display = ''; }
+    if (reg.waiting) onWaiting(reg.waiting);
     reg.addEventListener('updatefound', function(){ watch(reg.installing); });
+
+    /* 打开就主动问一次,不用等浏览器自己什么时候想起来 */
+    reg.update().catch(function(){});
 
     /* 别在抽奖过程中自动刷新 */
     setInterval(function(){ if (!S.rolling) reg.update(); }, 60 * 60 * 1000);
