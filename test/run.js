@@ -12,6 +12,8 @@ const SUITES = {
   pdf: require('./pdf.test.js'),
   storage: require('./storage.test.js'),
   assets: require('./assets.test.js'),
+  audio: require('./audio.test.js'),
+  edge: require('./edge.test.js'),
 };
 
 (async () => {

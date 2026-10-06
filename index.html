@@ -682,7 +682,7 @@ td input{padding:9px 10px;font-size:15px}
           </label>
           <button class="ghost" id="bTestSnd">ทดสอบ 试听</button>
         </div>
-        <p class="hint">滚动时是低沉的炉膛嗡鸣 + 走字声,停止时是金属浇铸的清脆声。全部由浏览器实时合成,不需要音频文件。<br>
+        <p class="hint">滚动时是暖和的低音铺底 + 逐渐加快的心跳 + 八音盒似的走字声,停止时是木琴的音阶。全部由浏览器实时合成,不需要音频文件。<br>
         投影仪接 HDMI 时注意声音输出设备选对。</p>
       </div>
 
@@ -697,7 +697,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v27';
+var APP_VERSION = 'v29';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -774,145 +774,184 @@ function audioReady(){
   var C = window.AudioContext || window.webkitAudioContext;
   if (!C) return false;
   A.ctx = new C();
+
+  /* A.master 是音量滑杆直接控制的那一级,后面再挂「柔化链」。
+     顺序不能反 —— 滑杆写的是 A.master.gain.value。 */
   A.master = A.ctx.createGain();
   A.master.gain.value = A.vol;
-  A.master.connect(A.ctx.destination);
+
+  /* 压缩器:好几个音叠在一起时把峰值压住,不会爆音、不会忽大忽小 */
+  var comp = A.ctx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 26;
+  comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.22;
+
+  /* 3kHz 往上压 9dB。人耳对 2-5kHz 最敏感,「刺耳」基本都来自这一段,
+     手机和投影仪那种小喇叭尤其容易在这里发尖。 */
+  var tame = A.ctx.createBiquadFilter();
+  tame.type = 'highshelf'; tame.frequency.value = 3000; tame.gain.value = -9;
+
+  /* 6.5kHz 以上整个切掉,嘶嘶的齿音就没有了 */
+  var air = A.ctx.createBiquadFilter();
+  air.type = 'lowpass'; air.frequency.value = 6500; air.Q.value = 0.6;
+
+  A.master.connect(comp); comp.connect(tame); tame.connect(air);
+  air.connect(A.ctx.destination);
   return true;
 }
+
+/* C 大调五声音阶。只用这几个音,随便几个叠在一起都不会打架 ——
+   中奖人数是 1 个还是 8 个,听起来都是和谐的。 */
+var PENTA = [523.25, 587.33, 659.25, 783.99, 880.00,
+             1046.50, 1174.66, 1318.51, 1567.98, 1760.00];
+
+/* 软木槌:基音 + 两个泛音,起音快、尾音长,像木琴/钟琴。
+   原来那个 clank() 是 2.6kHz 的噪声爆,金属味太冲,换掉。 */
+function mallet(freq, dur, gain, when, dest){
+  if (!A.on || !A.ctx) return;
+  var t = when || A.ctx.currentTime;
+  dur = dur || 1.1; gain = gain == null ? 0.18 : gain;
+  var PARTS = [[1, 1, 1], [2.01, 0.26, 0.45], [3.02, 0.08, 0.3]];
+  PARTS.forEach(function(q){
+    var o = A.ctx.createOscillator(), g = A.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(freq * q[0], t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain * q[1], t + 0.010);   // 快起音 = 敲击感
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur * q[2]);
+    o.connect(g); g.connect(dest || A.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  });
+}
+/* 简单的单音,只用 sine / triangle —— 不再用 square 和 sawtooth */
 function blip(freq, dur, type, gain, when){
   if (!A.on || !A.ctx) return;
   var t = when || A.ctx.currentTime;
   var o = A.ctx.createOscillator(), g = A.ctx.createGain();
-  o.type = type || 'triangle';
+  o.type = (type === 'square' || type === 'sawtooth') ? 'triangle' : (type || 'sine');
   o.frequency.setValueAtTime(freq, t);
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain == null ? 0.25 : gain, t + 0.006);
-  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  g.gain.linearRampToValueAtTime(gain == null ? 0.2 : gain, t + 0.014);
+  g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
   o.connect(g); g.connect(A.master);
   o.start(t); o.stop(t + dur + 0.02);
-}
-/* metallic clank: short filtered noise burst */
-function clank(gain, when){
-  if (!A.on || !A.ctx) return;
-  var t = when || A.ctx.currentTime;
-  var len = Math.floor(A.ctx.sampleRate * 0.22);
-  var buf = A.ctx.createBuffer(1, len, A.ctx.sampleRate);
-  var d = buf.getChannelData(0);
-  for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-  var src = A.ctx.createBufferSource(); src.buffer = buf;
-  var bp = A.ctx.createBiquadFilter(); bp.type = 'bandpass';
-  bp.frequency.setValueAtTime(2600, t); bp.Q.value = 2.2;
-  bp.frequency.exponentialRampToValueAtTime(900, t + 0.2);
-  var g = A.ctx.createGain(); g.gain.value = gain == null ? 0.3 : gain;
-  src.connect(bp); bp.connect(g); g.connect(A.master);
-  src.start(t);
 }
 function soundRollStart(rank){
   if (!A.on || !audioReady()) return;
   var t = A.ctx.currentTime;
-  var R = 12;                       // seconds to full intensity
-  var heavy = 0.55 + 0.45 * rank;   // higher tier = heavier
+  var R = 12;                       // 到最紧张要多少秒
+  var heavy = 0.6 + 0.4 * rank;     // 越压轴越厚
 
   A.bus = A.ctx.createGain();
   A.bus.gain.value = 1;
   A.bus.connect(A.master);
 
-  /* two detuned saws — the beating between them is the unease */
+  /* 暖垫:A 小调的几个音叠起来,三角波,音高固定不动。
+     原来是两个锯齿波一路从 46Hz 滑到 120Hz —— 滑音像警报器,
+     加上 Q=6 的共振滤波,嗡得发尖。改成固定的和声踏板音,
+     紧张感交给音量、滤波和心跳速度去推。 */
   A.filt = A.ctx.createBiquadFilter();
   A.filt.type = 'lowpass';
-  A.filt.frequency.setValueAtTime(260, t);
-  A.filt.frequency.linearRampToValueAtTime(1400, t + R);
-  A.filt.Q.value = 6;
+  A.filt.frequency.setValueAtTime(320, t);
+  A.filt.frequency.linearRampToValueAtTime(1500, t + R);
+  A.filt.Q.value = 0.8;                       // 不做共振峰,就不会发尖
   A.droneGain = A.ctx.createGain();
   A.droneGain.gain.setValueAtTime(0, t);
-  A.droneGain.gain.linearRampToValueAtTime(0.17 * heavy, t + 1.2);
-  A.droneGain.gain.linearRampToValueAtTime(0.26 * heavy, t + R);
+  A.droneGain.gain.linearRampToValueAtTime(0.085 * heavy, t + 1.4);
+  A.droneGain.gain.linearRampToValueAtTime(0.145 * heavy, t + R);
   A.filt.connect(A.droneGain); A.droneGain.connect(A.bus);
 
+  /* A 小调的和声踏板音,铺满四个八度。上面那两个音(220 / 330Hz)不能省 ——
+     手机和投影仪的小喇叭放不出 150Hz 以下的声音,只留低音的话现场等于没声。 */
   A.drones = [];
-  [0, 1].forEach(function(k){
-    var o = A.ctx.createOscillator();
-    o.type = 'sawtooth';
-    var base = 46 + k * 0.7;
-    o.frequency.setValueAtTime(base, t);
-    o.frequency.linearRampToValueAtTime(base * 2.6, t + R);
-    o.connect(A.filt); o.start(t);
+  [[55.00, 0.50], [82.41, 0.50], [110.00, 0.80], [164.81, 0.65],
+   [220.00, 0.62], [329.63, 0.38], [440.00, 0.20]].forEach(function(q, k){
+    var o = A.ctx.createOscillator(), g = A.ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(q[0] * (k === 1 ? 1.002 : 1), t);  // 极轻的失谐,厚一点,不到发抖的程度
+    g.gain.value = q[1];
+    o.connect(g); g.connect(A.filt); o.start(t);
     A.drones.push(o);
   });
 
-  /* riser: band-passed noise sweeping upward */
+  /* 低频气流声。原来是噪声扫到 5.2kHz 的 riser,那是最嘶的一段;
+     现在封在 1.2kHz 以下,只剩一点点「风」的感觉。 */
   var len = Math.floor(A.ctx.sampleRate * 3);
   var buf = A.ctx.createBuffer(1, len, A.ctx.sampleRate);
-  var d = buf.getChannelData(0);
-  for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  var d = buf.getChannelData(0), last = 0;
+  for (var i = 0; i < len; i++){                 // 简单的一阶低通 = 偏粉红的噪声,没有白噪那么刺
+    last = last * 0.86 + (Math.random() * 2 - 1) * 0.14;
+    d[i] = last * 3.2;
+  }
   A.riser = A.ctx.createBufferSource();
   A.riser.buffer = buf; A.riser.loop = true;
   var bp = A.ctx.createBiquadFilter();
-  bp.type = 'bandpass'; bp.Q.value = 1.4;
-  bp.frequency.setValueAtTime(420, t);
-  bp.frequency.exponentialRampToValueAtTime(5200, t + R);
+  bp.type = 'lowpass'; bp.Q.value = 0.7;
+  bp.frequency.setValueAtTime(300, t);
+  bp.frequency.linearRampToValueAtTime(1200, t + R);
   A.riserGain = A.ctx.createGain();
   A.riserGain.gain.setValueAtTime(0, t);
-  A.riserGain.gain.linearRampToValueAtTime(0.11 * heavy, t + R);
+  A.riserGain.gain.linearRampToValueAtTime(0.055 * heavy, t + R);
   A.riser.connect(bp); bp.connect(A.riserGain); A.riserGain.connect(A.bus);
   A.riser.start(t);
 
-  /* heartbeat, accelerating 82 → 168 bpm */
+  /* 心跳,82 → 168 bpm 逐渐加快 */
   A.beatT0 = A.ctx.currentTime;
   (function beat(){
     if (!A.on || !A.ctx || !A.drones) return;
     var k = Math.min(1, (A.ctx.currentTime - A.beatT0) / R);
-    thump(0.30 + 0.30 * k * heavy);
+    thump(0.24 + 0.26 * k * heavy);
     var bpm = 82 + 86 * k;
     A.beatTimer = setTimeout(beat, 60000 / bpm);
   })();
 
-  /* name ticks */
+  /* 走字声:原来是 1450-2080Hz 的方波,就是最刺耳的那个。
+     换成五声音阶上的小木槌,轻轻的,像八音盒。 */
   var n = 0;
   A.tickTimer = setInterval(function(){
+    var f = PENTA[(n * 3 + 2) % 5 + 3];          // 在中高音区绕,不重复得太规律
+    mallet(f, 0.26, 0.035, A.ctx.currentTime, A.bus);   // 挂在 bus 上,按停止时跟着一起淡掉
     n++;
-    blip(1450 + (n % 4) * 210, 0.03, 'square', 0.05);
-  }, 118);
+  }, 128);
 }
 function thump(gain){
   if (!A.on || !A.ctx) return;
   var t = A.ctx.currentTime;
   var o = A.ctx.createOscillator(), g = A.ctx.createGain();
   o.type = 'sine';
-  o.frequency.setValueAtTime(112, t);
-  o.frequency.exponentialRampToValueAtTime(34, t + 0.16);
-  g.gain.setValueAtTime(gain, t);
-  g.gain.exponentialRampToValueAtTime(0.0008, t + 0.24);
+  o.frequency.setValueAtTime(104, t);
+  o.frequency.exponentialRampToValueAtTime(38, t + 0.17);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.008);   // 不再从满音量硬切进去,少一下「噗」的爆音
+  g.gain.exponentialRampToValueAtTime(0.0006, t + 0.26);
   o.connect(g); g.connect(A.bus || A.master);
-  o.start(t); o.stop(t + 0.28);
+  o.start(t); o.stop(t + 0.3);
 }
 function soundRollStop(){
   clearInterval(A.tickTimer); A.tickTimer = null;
   clearTimeout(A.beatTimer); A.beatTimer = null;
   if (!A.ctx) return;
   var t = A.ctx.currentTime;
-  /* hard cut into silence — the hush before the reveal */
+  /* 淡出到安静 —— 揭晓前的那一下留白 */
   if (A.bus){
     A.bus.gain.cancelScheduledValues(t);
     A.bus.gain.setValueAtTime(A.bus.gain.value, t);
-    A.bus.gain.exponentialRampToValueAtTime(0.0006, t + 0.09);
+    A.bus.gain.exponentialRampToValueAtTime(0.0006, t + 0.16);
   }
-  if (A.drones){ A.drones.forEach(function(o){ try{ o.stop(t + 0.14); }catch(e){} }); A.drones = null; }
-  if (A.riser){ try{ A.riser.stop(t + 0.14); }catch(e){} A.riser = null; }
+  if (A.drones){ A.drones.forEach(function(o){ try{ o.stop(t + 0.22); }catch(e){} }); A.drones = null; }
+  if (A.riser){ try{ A.riser.stop(t + 0.22); }catch(e){} A.riser = null; }
 }
-/* the pour: winner revealed */
+/* 揭晓:一个人一个音,按五声音阶往上走 */
 function soundReveal(index, isLast){
   if (!A.on || !audioReady()) return;
   var t = A.ctx.currentTime;
-  clank(0.34, t);
-  var notes = [523.25, 659.25, 783.99, 1046.5];
-  var base = notes[Math.min(index, 2)];
-  blip(base, 0.5, 'triangle', 0.22, t + 0.02);
-  blip(base * 2, 0.35, 'sine', 0.1, t + 0.05);
+  var f = PENTA[Math.min(index, PENTA.length - 1)];
+  mallet(f, 1.8, 0.20, t);
+  mallet(f / 2, 2.2, 0.085, t + 0.012);        // 低八度垫底,厚实一点
   if (isLast){
-    blip(notes[1], 0.4, 'triangle', 0.18, t + 0.30);
-    blip(notes[3], 0.9, 'triangle', 0.22, t + 0.52);
-    blip(notes[3] * 1.5, 0.8, 'sine', 0.09, t + 0.56);
+    /* 最后一位:一个柔和的大三和弦,一个个铺上去 */
+    [523.25, 659.25, 783.99, 1046.50].forEach(function(n, i){
+      mallet(n, 2.6, 0.13 - i * 0.015, t + 0.34 + i * 0.1);
+    });
   }
 }
 
@@ -1320,11 +1359,15 @@ function stopRoll(){
 function fanfare(){
   if (!A.on || !audioReady()) return;
   var t = A.ctx.currentTime;
-  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(function(f, i){
-    blip(f, 0.7, 'triangle', 0.2, t + i * 0.13);
-    blip(f * 2, 0.5, 'sine', 0.07, t + i * 0.13);
+  /* 全部抽完:五声音阶往上跑一趟,落在一个敞亮的大三和弦上。
+     原来结尾是两记金属噪声爆,放在安静的收场里特别突兀。 */
+  [0, 1, 2, 3, 4, 5].forEach(function(i){
+    mallet(PENTA[i], 1.3, 0.17, t + i * 0.115);
   });
-  clank(0.3, t); clank(0.24, t + 0.65);
+  [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach(function(f, i){
+    mallet(f, 3.2, 0.14 - i * 0.012, t + 0.78 + i * 0.055);
+  });
+  mallet(261.63, 3.4, 0.1, t + 0.78);           // 低八度的根音
 }
 
 function undo(){
@@ -1344,14 +1387,52 @@ function undo(){
 }
 
 /* ---------- pool input ---------- */
+/* 导入时清理重复。名单从 Excel / PDF 里来,多半是几张表拼起来的,
+   同一个人出现两次很常见 —— 不处理的话他的中奖概率就是别人的两倍。
+
+   姓名和工号都一样  → 同一个人,留一条
+   重名但没有工号     → 真有可能是两个人,不敢替用户删,但要提醒去核对 */
+function dedupePool(list){
+  var seen = {}, out = [], dropped = 0, byName = {};
+  list.forEach(function(p){
+    if (p.sub){
+      var k = p.name + '\u0000' + p.sub;
+      if (seen[k]){ dropped++; return; }
+      seen[k] = 1;
+    } else {
+      byName[p.name] = (byName[p.name] || 0) + 1;
+    }
+    out.push(p);
+  });
+  var ambiguous = Object.keys(byName).filter(function(n){ return byName[n] > 1; });
+  return { list: out, dropped: dropped, ambiguous: ambiguous };
+}
 function setPool(list){
-  S.pool = list;
+  var r = dedupePool(list);
+  S.pool = r.list;
   S.winners = []; S.history = [];
   syncActive();
-  renderRail(); resetStage();
+  renderRail(); resetStage(); renderPoolList();
   autosave();
-  $('#poolNote').textContent = list.length + ' 人已载入';
-  toast('นำเข้าแล้ว · 已导入 ' + list.length + ' 人');
+
+  var note = r.list.length + ' 人已载入';
+  if (r.dropped) note += ' · 去掉 ' + r.dropped + ' 条重复';
+  if (r.ambiguous.length) note += ' · ⚠ ' + r.ambiguous.length + ' 个重名没有工号,请核对';
+  $('#poolNote').textContent = note;
+
+  var msg = 'นำเข้าแล้ว · 已导入 ' + r.list.length + ' 人';
+  if (r.dropped){
+    msg += ',去掉 ' + r.dropped + ' 条重复(姓名和工号都一样)';
+  }
+  toast(msg);
+  if (r.ambiguous.length){
+    setTimeout(function(){
+      toast('⚠ 有 ' + r.ambiguous.length + ' 个重名但没填工号(' +
+            r.ambiguous.slice(0, 3).join('、') +
+            (r.ambiguous.length > 3 ? ' 等' : '') +
+            '),分不清是一个人还是两个人,已全部保留 —— 请到名单里核对');
+    }, 2800);
+  }
 }
 function parseCSV(text){
   var rows = [], row = [], cur = '', q = false;
