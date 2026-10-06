@@ -216,7 +216,10 @@ input,select{font:inherit;color:inherit}
 /* stage */
 .stage{position:relative;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .crucible{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  /* 从顶上排起,公司抬头就贴在最上面;
+     后面用 auto margin 把「标题 + 名字」在剩下的空间里重新居中,
+     所以舞台内容看起来还是居中的,只是抬头被提到了顶上。 */
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   padding:24px;position:relative;min-height:0;--heat:0;
 }
 .heat{
@@ -251,6 +254,7 @@ input,select{font:inherit;color:inherit}
 @keyframes breathe{50%{opacity:calc(var(--heat) * .55)}}
 
 .eyebrow{
+  margin-top:auto;                 /* 和下面 .slots 的 margin-bottom:auto 一起,把内容居中 */
   margin-bottom:20px;text-align:center;position:relative;z-index:2;
 }
 /* 主行:当前抽的是哪个奖,投影上要看得清 */
@@ -274,7 +278,7 @@ input,select{font:inherit;color:inherit}
    两样都没设就整块不显示;滚动时(.app.focus)收起来,把高度全让给名字。 */
 .stage-head{
   display:none;align-items:center;justify-content:center;gap:clamp(14px,2vw,26px);
-  width:100%;margin-bottom:clamp(12px,2vh,26px);position:relative;z-index:2;
+  width:100%;margin-bottom:clamp(8px,1.4vh,18px);position:relative;z-index:2;flex:none;
 }
 .stage-head.on{display:flex}
 .app.focus .stage-head{display:none}
@@ -300,7 +304,7 @@ input,select{font:inherit;color:inherit}
   font-size:clamp(13px,1.3vw,20px);letter-spacing:.06em;margin-top:2px;overflow-wrap:anywhere;
 }
 .slots{
-  display:grid;gap:12px;width:100%;max-width:1180px;
+  display:grid;gap:12px;width:100%;max-width:1180px;margin-bottom:auto;
   align-content:center;justify-items:center;position:relative;z-index:2;will-change:transform;
 }
 
@@ -888,7 +892,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v36';
+var APP_VERSION = 'v37';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 

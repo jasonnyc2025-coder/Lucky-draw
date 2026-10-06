@@ -173,6 +173,20 @@ module.exports = async function run({ url }) {
     R.check('Logo 和公司名之间有一条竖线隔开',
             parseFloat(org.line) > 0, 'border-left: ' + org.line);
 
+    /* 抬头要贴在舞台最上面,不能跟着内容一起垂直居中 */
+    const pos = await page.evaluate(() => {
+      const cru = document.querySelector('#crucible').getBoundingClientRect();
+      const hd = document.querySelector('#stageHead').getBoundingClientRect();
+      const eb = document.querySelector('#eyebrow').getBoundingClientRect();
+      return { fromTop: Math.round(hd.top - cru.top),
+               gapToTitle: Math.round(eb.top - hd.bottom),
+               cruH: Math.round(cru.height) };
+    });
+    R.check('公司抬头贴在舞台最上面(不跟着内容一起垂直居中)',
+            pos.fromTop <= 40 && pos.fromTop < pos.cruH * 0.12, JSON.stringify(pos));
+    R.check('标题和名字仍然在剩下的空间里居中',
+            pos.gapToTitle > 40, '抬头到标题 ' + pos.gapToTitle + 'px');
+
     // 滚动时要收起来,把高度让给名字
     await page.click('#bNames'); await page.waitForTimeout(220);
     await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
