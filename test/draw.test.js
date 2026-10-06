@@ -214,6 +214,30 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             focusAfter.rail && focusAfter.reset,
             JSON.stringify(focusAfter));
 
+    /* 揭晓卡上的工号也要看得清 —— 原来固定 10-18px,名字能到 104px */
+    {
+      const sz = await page.evaluate(() => {
+        const nm = document.querySelector('.ingot .nm'), sb = document.querySelector('.ingot .sub');
+        return nm && sb ? { nm: +getComputedStyle(nm).fontSize.replace('px', ''),
+                            sub: +getComputedStyle(sb).fontSize.replace('px', '') } : null;
+      });
+      if (sz) R.check('揭晓卡上的工号不会小到看不清(至少是姓名的 1/4)',
+                      sz.sub / sz.nm >= 0.25,
+                      sz.nm + 'px / ' + sz.sub + 'px = ' + Math.round(sz.sub / sz.nm * 100) + '%');
+    }
+
+    /* 揭晓卡上的工号也要看得清 —— 原来固定 10-18px,名字能到 104px */
+    {
+      const sz = await page.evaluate(() => {
+        const nm = document.querySelector('.ingot .nm'), sb = document.querySelector('.ingot .sub');
+        return nm && sb ? { nm: +getComputedStyle(nm).fontSize.replace('px', ''),
+                            sub: +getComputedStyle(sb).fontSize.replace('px', '') } : null;
+      });
+      if (sz) R.check('揭晓卡上的工号不会小到看不清(至少是姓名的 1/4)',
+                      sz.sub / sz.nm >= 0.25,
+                      sz.nm + 'px / ' + sz.sub + 'px = ' + Math.round(sz.sub / sz.nm * 100) + '%');
+    }
+
     // ---------- 4.5 结束总榜 ----------
     await page.waitForTimeout(3000);          // 最后一位在台上停 2.6 秒后切总榜
     const board = await page.evaluate(() => {

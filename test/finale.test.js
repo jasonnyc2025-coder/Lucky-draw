@@ -127,6 +127,34 @@ module.exports = async function run({ url }) {
             board.subs.length === 6 && board.subs.every(v => /^\d{5}$/.test(v)),
             JSON.stringify(board.subs));
 
+    // ---------- 2.5 工号要看得清 ----------
+    /* 原来工号那行是固定 10-18px,名字最大 104px,差了五六倍,投影上看不清。
+       现在跟着名字一起缩放,至少是名字的四分之一。 */
+    {
+      const sz = await page.evaluate(() => {
+        const c = document.querySelector('.board .bname');
+        return { nm: +getComputedStyle(c.querySelector('b')).fontSize.replace('px', ''),
+                 sub: +getComputedStyle(c.querySelector('span')).fontSize.replace('px', '') };
+      });
+      R.check('总榜上工号不会小到看不清(至少是姓名的 1/4)',
+              sz.sub / sz.nm >= 0.25, sz.nm + 'px / ' + sz.sub + 'px = ' +
+              Math.round(sz.sub / sz.nm * 100) + '%');
+    }
+
+    // ---------- 2.5 工号要看得清 ----------
+    /* 原来工号那行是固定 10-18px,名字最大能到 104px —— 差了五六倍,投影上看不清。
+       现在跟着名字一起缩放。 */
+    {
+      const sz = await page.evaluate(() => {
+        const c = document.querySelector('.board .bname');
+        return { nm: +getComputedStyle(c.querySelector('b')).fontSize.replace('px', ''),
+                 sub: +getComputedStyle(c.querySelector('span')).fontSize.replace('px', '') };
+      });
+      R.check('总榜上工号不会小到看不清(至少是姓名的 1/4)',
+              sz.sub / sz.nm >= 0.25,
+              sz.nm + 'px / ' + sz.sub + 'px = ' + Math.round(sz.sub / sz.nm * 100) + '%');
+    }
+
     // ---------- 3. 烟花 ----------
     const fw = await page.evaluate(() => ({
       on: document.querySelector('#fw').classList.contains('on'),
@@ -173,6 +201,33 @@ module.exports = async function run({ url }) {
     R.check('烟花开关关掉重开还记得',
             await page.evaluate(() => FW.on === false &&
                                       document.querySelector('#fwOn').checked === false));
+
+    // ---------- 5. 每抽完一轮也放一次,放完自己收 ----------
+    await page.evaluate(() => { FW.on = true; });
+    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await page.check('#fwOn'); await page.waitForTimeout(200);
+    await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      S.tiers = [{ id: 'r1', th: 'รางวัลที่ 3', zh: '三等奖', quota: 9, per: 3 }];
+      S.winners = []; S.history = [];
+      syncActive(); renderRail(); resetStage(); updateControls();
+    });
+    await page.click('#bPour'); await page.waitForTimeout(1100);
+    await page.click('#bPour'); await page.waitForTimeout(1400);
+    const mid = await page.evaluate(() => ({
+      mode: FW.mode, parts: FW.parts.length, on: document.querySelector('#fw').classList.contains('on'),
+      done: allDone(),
+    }));
+    R.check('抽完一轮(还没抽完全部)就在这一屏点一次烟花',
+            mid.mode === 'shot' && mid.parts > 0 && mid.on && !mid.done, JSON.stringify(mid));
+
+    await page.waitForTimeout(5000);
+    const settled = await page.evaluate(() => ({
+      parts: FW.parts.length, raf: !!FW.raf,
+      on: document.querySelector('#fw').classList.contains('on'),
+    }));
+    R.check('这一轮的烟花放完自己收,不会一直闪着挡名字',
+            settled.parts === 0 && !settled.raf && !settled.on, JSON.stringify(settled));
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
