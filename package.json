@@ -13,7 +13,8 @@
     "test:audio": "node test/run.js audio",
     "test:edge": "node test/run.js edge",
     "test:theme": "node test/run.js theme",
-    "test:update": "node test/run.js update"
+    "test:update": "node test/run.js update",
+    "test:finale": "node test/run.js finale"
   },
   "devDependencies": {
     "@fontsource/noto-sans-thai": "^5.3.0",

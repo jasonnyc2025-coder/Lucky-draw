@@ -8,6 +8,17 @@ const { reporter, chromium } = require('./lib/harness');
 const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ' +
              'AAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+
+/* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
+   不再是两个下拉框。roles 是按列顺序给的数组。 */
+async function setCols(page, roles) {
+  await page.evaluate((rs) => {
+    const sels = [...document.querySelectorAll('#cols select')];
+    sels.forEach((s, i) => { s.value = rs[i] == null ? '' : rs[i]; });
+    previewMap();
+  }, roles);
+}
+
 module.exports = async function run({ url, staffXlsx }) {
   const R = reporter('本机存档 storage');
   const browser = await chromium().launch();
@@ -41,8 +52,7 @@ module.exports = async function run({ url, staffXlsx }) {
     if (staffXlsx) {
       await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible' });
-      await page.selectOption('#colName', '0');
-      await page.selectOption('#colSub', '1');
+      await setCols(page, ['name', 'sub', '']);
       await page.click('#bApplyFile');
     } else {
       await page.fill('#paste', Array.from({ length: 60 },

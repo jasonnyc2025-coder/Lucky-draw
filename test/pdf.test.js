@@ -4,6 +4,17 @@
 
 const { reporter, chromium, staffRows } = require('./lib/harness');
 
+
+/* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
+   不再是两个下拉框。roles 是按列顺序给的数组。 */
+async function setCols(page, roles) {
+  await page.evaluate((rs) => {
+    const sels = [...document.querySelectorAll('#cols select')];
+    sels.forEach((s, i) => { s.value = rs[i] == null ? '' : rs[i]; });
+    previewMap();
+  }, roles);
+}
+
 module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
   const R = reporter('PDF 导入 pdf');
   const browser = await chromium().launch();
@@ -32,7 +43,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
       head: S.fileRows[0],
       first: S.fileRows[1],
       last: S.fileRows[S.fileRows.length - 1],
-      opts: [...document.querySelectorAll('#colName option')].length,
+      opts: [...document.querySelectorAll('#cols .colrow')].length,
     }));
     const want = staffRows();
     R.check('PDF 解析出 61 行(表头 + 60 人)', parsed.rows === 61, 'rows=' + parsed.rows);
@@ -46,7 +57,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
             JSON.stringify(parsed.first));
     R.check('跨页的最后一行也在', JSON.stringify(parsed.last) === JSON.stringify(want[60]),
             JSON.stringify(parsed.last));
-    R.check('列选择器和 Excel 一样出现', parsed.opts === 3, 'options=' + parsed.opts);
+    R.check('每一列都列出来了,和 Excel 一样可以逐列派用处', parsed.opts === 3, 'cols=' + parsed.opts);
 
     const names = await page.evaluate(() => S.fileRows.slice(1).map(r => r[0]));
     const wantNames = want.slice(1).map(r => r[0]);
@@ -75,8 +86,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
             '最差保留率 ' + Math.round(Math.min.apply(null, keptRatio) * 100) + '%');
 
     // ---------- 2. 走完导入 ----------
-    await page.selectOption('#colName', '0');
-    await page.selectOption('#colSub', '1');
+    await setCols(page, ['name', 'sub', '']);
     await page.click('#bApplyFile');
     await page.waitForTimeout(500);
     const pool = await page.evaluate(() => ({

@@ -5,6 +5,17 @@ const fs = require('fs');
 const path = require('path');
 const { reporter, chromium } = require('./lib/harness');
 
+
+/* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
+   不再是两个下拉框。roles 是按列顺序给的数组。 */
+async function setCols(page, roles) {
+  await page.evaluate((rs) => {
+    const sels = [...document.querySelectorAll('#cols select')];
+    sels.forEach((s, i) => { s.value = rs[i] == null ? '' : rs[i]; });
+    previewMap();
+  }, roles);
+}
+
 module.exports = async function run({ url, fixtures, staffXlsx }) {
   const R = reporter('抽奖全流程 draw');
   const browser = await chromium().launch();
@@ -39,11 +50,13 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       await page.click('#bNames');
       await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible', timeout: 5000 });
-      const opts = await page.evaluate(() =>
-        [...document.querySelectorAll('#colName option')].map(o => o.value + '=' + o.textContent));
-      R.check('Excel 解析出列选择器', opts.length >= 3, opts.join(' | '));
-      await page.selectOption('#colName', '0');   // 姓名
-      await page.selectOption('#colSub', '1');    // 工号
+      const cols = await page.evaluate(() =>
+        [...document.querySelectorAll('#cols .colrow')].map(r => r.querySelector('.ch b').textContent));
+      R.check('Excel 解析出每一列,可以逐列派用处', cols.length >= 3, cols.join(' | '));
+      await setCols(page, ['name', 'sub', '']);   // 姓名 / 工号 / 部门不要
+      const demo = await page.evaluate(() => document.querySelector('#mapDemo').textContent);
+      R.check('确认前先按舞台卡片的样子预览一遍(选错列一眼看得出)',
+              /Tester|สมชาย|[\u4e00-\u9fa5]/.test(demo), demo);
       await page.click('#bApplyFile');
     } else {
       // 没装 xlsx 时退回粘贴导入,后面的断言不变
@@ -207,7 +220,9 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       const b = document.querySelector('.board');
       if (!b) return null;
       return {
-        cells: [...document.querySelectorAll('.bname b')].map(e => e.textContent),
+        /* 一定要带 .board 前缀 —— 导入界面的「舞台上会长这样」那张预览卡
+           也用了 .bname,不限定范围会把它一起数进来。 */
+        cells: [...document.querySelectorAll('.board .bname b')].map(e => e.textContent),
         groups: document.querySelectorAll('.bgrp').length,
         topFirst: document.querySelector('.bgrp').classList.contains('top'),
         fits: b.scrollHeight <= b.clientHeight,
@@ -227,7 +242,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await page.waitForTimeout(400);
     const reflow = await page.evaluate(() => {
       const b = document.querySelector('.board');
-      return b ? { cells: document.querySelectorAll('.bname').length,
+      return b ? { cells: document.querySelectorAll('.board .bname').length,
                    fits: b.scrollHeight <= b.clientHeight,
                    fs: getComputedStyle(b).getPropertyValue('--bfs').trim() } : null;
     });

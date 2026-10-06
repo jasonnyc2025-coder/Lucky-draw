@@ -16,6 +16,7 @@ const SUITES = {
   edge: require('./edge.test.js'),
   theme: require('./theme.test.js'),
   update: require('./update.test.js'),
+  finale: require('./finale.test.js'),
 };
 
 (async () => {

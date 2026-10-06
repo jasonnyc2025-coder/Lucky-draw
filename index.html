@@ -138,6 +138,25 @@ input,select{font:inherit;color:inherit}
 .tbtn.muted{color:#8D7D6F;border-color:#453931}
 .logo-prev{max-height:70px;max-width:230px;object-fit:contain;background:var(--slag);border:1px solid var(--line);border-radius:3px;padding:8px;display:none}
 .logo-prev.on{display:block}
+.cols{display:grid;gap:8px}
+.colrow{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:var(--slag);
+}
+.colrow .ch{flex:1;min-width:130px;overflow:hidden}
+.colrow .ch b{display:block;font-size:14px;color:var(--bone);overflow-wrap:anywhere}
+.colrow .ch em{font-style:normal;font-size:12.5px;color:var(--ash);overflow-wrap:anywhere}
+.colrow select{width:auto;min-width:118px;flex:none;font-size:14px;padding:8px 10px}
+.colrow.use-name{border-color:var(--pour)}
+.colrow.use-sub{border-color:var(--ash)}
+/* 确认前先看一眼卡片长什么样 —— 列选错了(比如把工号当成姓名)一眼就看出来。
+   这里故意复用总榜卡片的 .bname 样式,所以查总榜的卡片时要写 .board .bname,
+   不然会把这张预览卡也数进去。 */
+.mapcard{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:4px}
+.mapcard-h{font-family:var(--f-util);font-size:12px;letter-spacing:.14em;color:var(--ash);margin-bottom:9px}
+.mapcard .bname{--bfs:30px;display:inline-block}
+.mapcard .bname b{display:block;font-size:26px}
+.mapcard .bname span{display:block;font-size:14px;color:var(--ash);margin-top:3px}
 .themes{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
 .theme{
   display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;
@@ -246,6 +265,10 @@ input,select{font:inherit;color:inherit}
 }
 .eyebrow b{color:var(--pour);font-weight:700}
 
+/* 烟花画布。z-index 1 —— 在舞台背景之上、名字(.slots 是 2)之下,
+   名字永远压在烟花上面,不会被挡住。 */
+.fw{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:none}
+.fw.on{display:block}
 .slots{
   display:grid;gap:12px;width:100%;max-width:1180px;
   align-content:center;justify-items:center;position:relative;z-index:2;will-change:transform;
@@ -565,6 +588,7 @@ td input{padding:9px 10px;font-size:15px}
       <div class="crucible" id="crucible">
         <div class="heat"></div>
         <div class="vig"></div>
+        <canvas class="fw" id="fw"></canvas>
         <div class="eyebrow" id="eyebrow">นำเข้ารายชื่อก่อนเริ่ม · 请先导入名单</div>
         <div class="slots" id="slots"></div>
         <div class="charge"><i id="chargeFill"></i></div>
@@ -616,13 +640,16 @@ td input{padding:9px 10px;font-size:15px}
           <p class="hint" style="margin-top:6px">PDF 只能读出文字版的内容;扫描件、拍照转的 PDF 里没有文字,读不出来。</p>
         </div>
         <div id="mapWrap" style="display:none;margin-top:16px">
-          <div class="row">
-            <label class="fld"><span>คอลัมน์ชื่อ · 姓名列</span><select id="colName"></select></label>
-            <label class="fld"><span>คอลัมน์รอง · 副信息列(工号/部门)</span><select id="colSub"></select></label>
-          </div>
-          <div class="row" style="margin-top:12px">
+          <p class="hint" style="margin-top:0">把每一列派一个用处。<b style="color:var(--pour)">姓名</b>可以选好几列,
+          会按顺序拼起来 —— 称谓和名字分开两列的话,两列都选「姓名」就行。</p>
+          <div class="cols" id="cols"></div>
+          <div class="row" style="margin-top:14px">
             <label class="chk"><input type="checkbox" id="hasHeader" checked> แถวแรกเป็นหัวตาราง · 首行是标题</label>
             <button class="solid" id="bApplyFile" style="margin-left:auto">ใช้รายชื่อนี้ 使用此名单</button>
+          </div>
+          <div class="mapcard" id="mapCard">
+            <div class="mapcard-h">舞台上会长这样 · ตัวอย่างบนเวที</div>
+            <div class="bname" id="mapDemo"><b>—</b></div>
           </div>
           <div class="hint" id="mapPreview"></div>
         </div>
@@ -747,6 +774,10 @@ td input{padding:9px 10px;font-size:15px}
             <b>หมึก 墨蓝</b><em>冷静 · 商务</em>
           </button>
         </div>
+        <div class="row" style="margin-bottom:14px">
+          <label class="chk"><input type="checkbox" id="fwOn" checked> ดอกไม้ไฟตอนจบ · 抽完放烟花</label>
+          <span class="hint" style="margin:0">全部抽完、总榜出来时放。名字永远压在烟花上面,不会被挡住。</span>
+        </div>
         <p class="hint">三套都量过对比度,投影上都看得清(正文 13:1 以上)。<br>
         <b style="color:var(--pour)">年会用「红金」</b> —— 喜庆,而且是三套里对比度最高的一套。<br>
         背景不支持放照片:舞台大标题、奖项列表、总榜的分组标题都是直接压在背景上的,
@@ -791,7 +822,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v31';
+var APP_VERSION = 'v32';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1168,6 +1199,7 @@ function eyebrow(main, sub){
 function resetStage(){
   S.frame = null; S.shown = null; S.revealing = false;
   setFocus(false);
+  fwStop();                     // 离开总榜就收掉;renderFinalBoard 会自己再点起来
   var t = tierById(S.activeTier);
   var slots = $('#slots');
   slots.innerHTML = '';
@@ -1292,6 +1324,7 @@ function renderFinalBoard(){
 
   slots.appendChild(board);
   fitBoard(board);
+  fwStart();
   updateControls();
 }
 function updateControls(){
@@ -1321,6 +1354,7 @@ function startRoll(){
 
   var rank = tierRank(t.id);
   S.frame = null; S.shown = null; S.revealing = false;
+  fwStop();
   S.rolling = true;
   setFocus(true);
   S.rank = rank;
@@ -1544,45 +1578,108 @@ function parseCSV(text){
   row.push(cur); if (row.some(function(c){ return c.trim(); })) rows.push(row);
   return rows.filter(function(r){ return r.some(function(c){ return String(c).trim(); }); });
 }
+/* 每一列派什么用:'name' 进姓名、'sub' 进副信息、'' 不要。
+   姓名可以选好几列,按文件里的先后拼起来 —— 泰文名单常见「称谓 | 名 | 姓」
+   分成三列,只能二选一的话名字就只剩一半。 */
+function colRoles(){
+  var out = [];
+  [].forEach.call(document.querySelectorAll('#cols select'), function(sel){
+    out[+sel.getAttribute('data-i')] = sel.value;
+  });
+  return out;
+}
+function joinCols(row, roles, want){
+  var parts = [];
+  for (var i = 0; i < roles.length; i++){
+    if (roles[i] !== want) continue;
+    var v = row[i] == null ? '' : String(row[i]).trim();
+    if (v) parts.push(v);
+  }
+  return parts.join(' ');
+}
 function loadRows(rows){
   if (!rows.length){ toast('ไฟล์ว่าง · 文件里没有数据'); return; }
   S.fileRows = rows;
   var width = Math.max.apply(null, rows.map(function(r){ return r.length; }));
-  var cn = $('#colName'), cs = $('#colSub');
-  cn.innerHTML = ''; cs.innerHTML = '<option value="-1">— ไม่ใช้ 不使用 —</option>';
+  var box = $('#cols');
+  box.innerHTML = '';
+
+  /* 猜一个默认:看起来像工号的(纯数字/字母数字)给副信息,其余给姓名。
+     猜错了也没关系 —— 下面的卡片预览会把结果直接摆出来。 */
+  var body = rows.slice(1, 6);
   for (var i = 0; i < width; i++){
-    var label = 'คอลัมน์ ' + (i+1) + '  ·  ' + String(rows[0][i] == null ? '' : rows[0][i]).slice(0, 18);
-    cn.appendChild(new Option(label, i));
-    cs.appendChild(new Option(label, i));
+    var head = String(rows[0][i] == null ? '' : rows[0][i]).trim();
+    var samples = body.map(function(r){ return String(r[i] == null ? '' : r[i]).trim(); })
+                      .filter(Boolean);
+    var idLike = samples.length && samples.every(function(v){ return /^[A-Za-z0-9\-_/]{2,}$/.test(v); });
+
+    var row = el('div','colrow');
+    var info = el('div','ch');
+    info.appendChild(el('b', null, 'คอลัมน์ ' + (i + 1) + (head ? ' · ' + head : '')));
+    info.appendChild(el('em', null, samples.slice(0, 2).join(' , ') || '(空)'));
+    row.appendChild(info);
+
+    var sel = document.createElement('select');
+    sel.setAttribute('data-i', i);
+    sel.appendChild(new Option('— 不用 —', ''));
+    sel.appendChild(new Option('姓名 ชื่อ', 'name'));
+    sel.appendChild(new Option('副信息 工号/部门', 'sub'));
+    sel.value = idLike ? 'sub' : 'name';
+    row.appendChild(sel);
+    box.appendChild(row);
   }
-  cn.value = '0'; cs.value = width > 1 ? '1' : '-1';
+  /* 一列都没当姓名的话(整张表都像工号),把第一列顶上去 */
+  if (!colRoles().some(function(r){ return r === 'name'; })){
+    var first = box.querySelector('select');
+    if (first) first.value = 'name';
+  }
   $('#mapWrap').style.display = 'block';
   previewMap();
 }
 function previewMap(){
   if (!S.fileRows) return;
   var start = $('#hasHeader').checked ? 1 : 0;
-  var ni = +$('#colName').value, si = +$('#colSub').value;
+  var roles = colRoles();
+
+  [].forEach.call(document.querySelectorAll('#cols .colrow'), function(r){
+    var v = r.querySelector('select').value;
+    r.classList.toggle('use-name', v === 'name');
+    r.classList.toggle('use-sub', v === 'sub');
+  });
+
+  /* 卡片预览:直接按舞台上的样子画出来。
+     列选错了(比如把工号当成姓名),这里一眼就看得出来。 */
+  var demoRow = null;
+  for (var i = start; i < S.fileRows.length; i++){
+    if (joinCols(S.fileRows[i], roles, 'name')){ demoRow = S.fileRows[i]; break; }
+  }
+  var card = $('#mapDemo');
+  card.innerHTML = '';
+  card.appendChild(el('b', null, demoRow ? joinCols(demoRow, roles, 'name') : '(没有选姓名列)'));
+  var dsub = demoRow ? joinCols(demoRow, roles, 'sub') : '';
+  if (dsub) card.appendChild(el('span', null, dsub));
+
   var sample = S.fileRows.slice(start, start + 3).map(function(r){
-    return String(r[ni] == null ? '' : r[ni]).trim() + (si >= 0 && r[si] != null && String(r[si]).trim() ? ' (' + String(r[si]).trim() + ')' : '');
+    var n = joinCols(r, roles, 'name'), b = joinCols(r, roles, 'sub');
+    return n ? (n + (b ? ' (' + b + ')' : '')) : '';
   }).filter(Boolean);
-  $('#mapPreview').innerHTML = '共 ' + Math.max(0, S.fileRows.length - start) + ' 行 · 预览: ' +
-    sample.join(' / ').replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) +
+  $('#mapPreview').innerHTML = '共 ' + Math.max(0, S.fileRows.length - start) + ' 行 · 前几行: ' +
+    esc(sample.join('  /  ')) +
     (S.fromPdf ? '<br><b style="color:var(--pour)">PDF 提取的文字可能缺字(泰文声调符号尤其容易丢),' +
                  '请仔细核对上面的预览再确认。名单重要的话建议用 Excel 或 CSV。</b>' : '');
 }
 function applyFile(){
   if (!S.fileRows) return;
   var start = $('#hasHeader').checked ? 1 : 0;
-  var ni = +$('#colName').value, si = +$('#colSub').value;
+  var roles = colRoles();
   var list = [];
   for (var i = start; i < S.fileRows.length; i++){
     var r = S.fileRows[i];
-    var nm = String(r[ni] == null ? '' : r[ni]).trim();
+    var nm = joinCols(r, roles, 'name');
     if (!nm) continue;
-    list.push({name:nm, sub: si >= 0 && r[si] != null ? String(r[si]).trim() : ''});
+    list.push({ name: nm, sub: joinCols(r, roles, 'sub') });
   }
-  if (!list.length){ toast('ไม่พบชื่อ · 选中的列没有姓名'); return; }
+  if (!list.length){ toast('ไม่พบชื่อ · 没有选姓名列,或者选的那列是空的'); return; }
   setPool(list);
   $('#vNames').classList.remove('on');
 }
@@ -1918,6 +2015,98 @@ function exportCSV(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
 }
 
+/* ---------- 烟花 ---------- */
+/* 全部抽完、总榜出来的时候放。只用 canvas,不依赖任何库。
+   名字压在烟花上面(.slots 的 z-index 比画布高),所以不会影响看名字。 */
+var FW_PREF = 'lucky-draw.fw';
+var FW = { cv:null, cx:null, raf:null, parts:[], next:0, t0:0, dpr:1, on:true };
+try { FW.on = localStorage.getItem(FW_PREF) !== 'off'; } catch(e){}
+
+function fwColors(){
+  var cs = getComputedStyle(document.documentElement);
+  var pour = cs.getPropertyValue('--pour').trim() || '#FF8A1F';
+  var hot  = cs.getPropertyValue('--whitehot').trim() || '#FFE9C4';
+  /* 主题色 + 几个通用的喜庆色,看起来才像真烟花而不是一团同色 */
+  return [pour, hot, '#FFFFFF', '#FF5E5E', '#6FD3FF', '#9CFF6F', '#FFD166'];
+}
+function fwResize(){
+  if (!FW.cv) return;
+  var r = FW.cv.getBoundingClientRect();
+  FW.dpr = Math.min(window.devicePixelRatio || 1, 2);   // 封顶 2,投影机上别白烧性能
+  FW.cv.width  = Math.max(1, Math.round(r.width  * FW.dpr));
+  FW.cv.height = Math.max(1, Math.round(r.height * FW.dpr));
+}
+function fwBurst(x, y, colors){
+  var col = colors[randInt(colors.length)];
+  var n = 46 + randInt(26);
+  var speed = 1.8 + Math.random() * 1.9;
+  for (var i = 0; i < n; i++){
+    var a = (Math.PI * 2 * i) / n + Math.random() * 0.12;
+    var v = speed * (0.55 + Math.random() * 0.75);
+    FW.parts.push({
+      x: x, y: y,
+      vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+      life: 1, decay: 0.0085 + Math.random() * 0.0075,
+      col: col, r: 1.1 + Math.random() * 1.6
+    });
+  }
+}
+function fwStart(){
+  if (!FW.on) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  FW.cv = $('#fw'); if (!FW.cv) return;
+  FW.cx = FW.cv.getContext('2d');
+  FW.cv.classList.add('on');
+  fwResize();
+  FW.parts.length = 0;
+  FW.t0 = performance.now();
+  FW.next = 0;
+  if (FW.raf) cancelAnimationFrame(FW.raf);
+
+  var colors = fwColors();
+  (function frame(now){
+    var W = FW.cv.width, H = FW.cv.height, d = FW.dpr;
+    /* 半透明盖一层做拖尾,比每帧清空好看,也比保存上一帧便宜 */
+    FW.cx.globalCompositeOperation = 'destination-out';
+    FW.cx.fillStyle = 'rgba(0,0,0,0.14)';
+    FW.cx.fillRect(0, 0, W, H);
+    FW.cx.globalCompositeOperation = 'lighter';
+
+    if (now >= FW.next && FW.parts.length < 1200){
+      /* 开头密集一点,之后放慢,免得一直闪得人看不下名字 */
+      var age = (now - FW.t0) / 1000;
+      var gap = age < 4 ? 420 : (age < 10 ? 900 : 1700);
+      FW.next = now + gap * (0.65 + Math.random() * 0.7);
+      fwBurst((0.12 + Math.random() * 0.76) * W,
+              (0.14 + Math.random() * 0.42) * H, colors);
+    }
+
+    for (var i = FW.parts.length - 1; i >= 0; i--){
+      var p = FW.parts[i];
+      p.vy += 0.028 * d;            // 重力
+      p.vx *= 0.986; p.vy *= 0.986; // 空气阻力
+      p.x += p.vx * d; p.y += p.vy * d;
+      p.life -= p.decay;
+      if (p.life <= 0){ FW.parts.splice(i, 1); continue; }
+      FW.cx.globalAlpha = Math.max(0, p.life);
+      FW.cx.fillStyle = p.col;
+      FW.cx.beginPath();
+      FW.cx.arc(p.x, p.y, p.r * d, 0, Math.PI * 2);
+      FW.cx.fill();
+    }
+    FW.cx.globalAlpha = 1;
+    FW.raf = requestAnimationFrame(frame);
+  })(performance.now());
+}
+function fwStop(){
+  if (FW.raf){ cancelAnimationFrame(FW.raf); FW.raf = null; }
+  FW.parts.length = 0;
+  if (FW.cv){
+    FW.cv.classList.remove('on');
+    if (FW.cx) FW.cx.clearRect(0, 0, FW.cv.width, FW.cv.height);
+  }
+}
+
 /* ---------- 配色主题 ---------- */
 var THEME_PREF = 'lucky-draw.theme';
 var THEMES = {
@@ -2188,8 +2377,7 @@ var drop = $('#drop');
   drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); });
 });
 drop.addEventListener('drop', function(e){ handleFile(e.dataTransfer.files[0]); });
-$('#colName').onchange = previewMap;
-$('#colSub').onchange = previewMap;
+$('#cols').onchange = previewMap;
 $('#hasHeader').onchange = previewMap;
 $('#bApplyFile').onclick = applyFile;
 
@@ -2239,6 +2427,14 @@ $('#bClearLogo').onclick = function(){ applyLogo(''); toast('ลบโลโก�
 /* 左上角那块直接点就能换 —— 换公司时不用先进设置再找 */
 $('#logoImg').onclick = function(){ $('#logoFile').click(); };
 $('#logoAdd').onclick = function(){ $('#logoFile').click(); };
+
+$('#fwOn').checked = FW.on;
+$('#fwOn').onchange = function(){
+  FW.on = this.checked;
+  try { localStorage.setItem(FW_PREF, FW.on ? 'on' : 'off'); } catch(e){}
+  if (!FW.on){ fwStop(); toast('ปิดดอกไม้ไฟแล้ว · 烟花已关闭'); }
+  else { toast('เปิดดอกไม้ไฟ · 烟花已开启,抽完会放'); if (allDone()) fwStart(); }
+};
 
 $('#themes').onclick = function(e){
   var b = e.target.closest ? e.target.closest('.theme') : null;
@@ -2295,7 +2491,7 @@ window.addEventListener('resize', function(){
   resizeTimer = setTimeout(function(){
     if (S.rolling || S.revealing) return;         // 正在转 / 正在逐个揭晓,别插手
     if (document.querySelector('.veil.on')) return;  // 面板开着,后面看不见,别白重排
-    if (allDone()){ renderFinalBoard(); return; } // 总榜:按新尺寸重排并重新缩放
+    if (allDone()){ renderFinalBoard(); return; } // 总榜:按新尺寸重排并重新缩放(烟花画布也会重新量)
     if (renderShown()) return;                    // 已揭晓的那一屏:重画,不清空
     resetStage();
   }, 150);
