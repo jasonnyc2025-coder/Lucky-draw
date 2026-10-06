@@ -269,6 +269,36 @@ input,select{font:inherit;color:inherit}
    名字永远压在烟花上面,不会被挡住。 */
 .fw{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:none}
 .fw.on{display:block}
+/* 舞台顶上的公司标识:Logo | 竖线 | 公司名。
+   横排不竖排 —— 结束总榜要吃掉大量纵向空间,竖排会把名字挤小一档。
+   两样都没设就整块不显示;滚动时(.app.focus)收起来,把高度全让给名字。 */
+.stage-head{
+  display:none;align-items:center;justify-content:center;gap:clamp(14px,2vw,26px);
+  width:100%;margin-bottom:clamp(12px,2vh,26px);position:relative;z-index:2;
+}
+.stage-head.on{display:flex}
+.app.focus .stage-head{display:none}
+.sh-logo{
+  height:clamp(44px,7vh,96px);width:auto;max-width:min(42vw,340px);
+  object-fit:contain;display:none;cursor:pointer;
+}
+.sh-logo.on{display:block}
+.sh-org{
+  display:none;flex-direction:column;line-height:1.22;text-align:left;min-width:0;
+}
+.sh-org.on{display:flex}
+/* 两样都在的时候,中间那条竖线 */
+.sh-logo.on+.sh-org.on{
+  border-left:1px solid var(--line);padding-left:clamp(14px,2vw,26px);
+}
+.sh-org b{
+  font-family:var(--f-display);font-weight:600;color:var(--bone);
+  font-size:clamp(17px,2.3vw,34px);letter-spacing:.01em;overflow-wrap:anywhere;
+}
+.sh-org span{
+  font-family:var(--f-cn);color:var(--ash);
+  font-size:clamp(13px,1.3vw,20px);letter-spacing:.06em;margin-top:2px;overflow-wrap:anywhere;
+}
 .slots{
   display:grid;gap:12px;width:100%;max-width:1180px;
   align-content:center;justify-items:center;position:relative;z-index:2;will-change:transform;
@@ -606,6 +636,10 @@ td input{padding:9px 10px;font-size:15px}
         <div class="heat"></div>
         <div class="vig"></div>
         <canvas class="fw" id="fw"></canvas>
+        <div class="stage-head" id="stageHead">
+          <img class="sh-logo" id="shLogo" alt="" title="เปลี่ยนโลโก้ · 点一下换 Logo">
+          <div class="sh-org" id="shOrg"><b></b><span></span></div>
+        </div>
         <div class="eyebrow" id="eyebrow">นำเข้ารายชื่อก่อนเริ่ม · 请先导入名单</div>
         <div class="slots" id="slots"></div>
         <div class="charge"><i id="chargeFill"></i></div>
@@ -814,7 +848,16 @@ td input{padding:9px 10px;font-size:15px}
           <button class="ghost" id="bClearLogo">ลบ 清除</button>
           <img class="logo-prev" id="logoPrev" alt="">
         </div>
-        <p class="hint"><b style="color:var(--pour)">换公司最快的办法</b>:直接点左上角那个 Logo(还没传过的话,宽屏上那里是一个虚线的「＋」方块),
+        <div class="row" style="margin-top:14px">
+          <label class="fld"><span>ชื่อบริษัท · 公司名称(主)</span>
+            <input type="text" id="orgMain" maxlength="60" placeholder="บริษัท ตัวอย่าง จำกัด"></label>
+          <label class="fld"><span>บรรทัดที่สอง · 第二行(可留空)</span>
+            <input type="text" id="orgSub" maxlength="60" placeholder="示例公司"></label>
+        </div>
+        <p class="hint">Logo 和公司名会一起显示在<b style="color:var(--pour)">舞台顶上正中间</b>,
+        中间用一条竖线隔开,投影上就是这场活动的抬头。滚动抽奖时自动收起,把高度让给名字;
+        两样都不填就整块不显示。<br>
+        <b style="color:var(--pour)">换公司最快的办法</b>:直接点左上角那个 Logo(还没传过的话,宽屏上那里是一个虚线的「＋」方块),
         马上就能选新图,不用进设置。手机那种窄屏顶栏排不下,就从这里传。<br>
         建议透明底 PNG。图片会自动缩到高 256px 再存,所以手机直接拍的大图、几 MB 的原图都能传,不用自己压。<br>
         Logo 存在这台设备上,换名单、清空名单都不会丢;「清除本机数据」才会连它一起删。</p>
@@ -845,7 +888,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v35';
+var APP_VERSION = 'v36';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -870,6 +913,7 @@ var S = {
   fileRows: null,
   fromPdf: false,
   logo: '',
+  org: { main:'', sub:'' },
   theme: 'forge',
   frame: null,       // 滚动时屏幕上正显示的这一组人 —— 按下停止就是他们中奖
   shown: null,       // 当前屏上已揭晓的人,resize 时用来重画而不是清空
@@ -1300,8 +1344,11 @@ function allDone(){
 /* 一屏放不下就把字号往下降一档,降到最小还放不下才允许滚动 */
 function fitBoard(board){
   function run(){
-    var cru = $('#crucible'), eb = $('#eyebrow');
-    var avail = cru.clientHeight - eb.offsetHeight - 56;
+    var cru = $('#crucible'), eb = $('#eyebrow'), hd = $('#stageHead');
+    /* 公司标识那一块也占地方,不减掉的话总榜会溢出 */
+    var headH = (hd && hd.classList.contains('on')) ? hd.offsetHeight +
+                parseFloat(getComputedStyle(hd).marginBottom || 0) : 0;
+    var avail = cru.clientHeight - eb.offsetHeight - headH - 56;
     board.style.maxHeight = Math.max(160, avail) + 'px';
     var sizes = [40, 34, 29, 25, 21, 18, 15, 13, 11];
     for (var i = 0; i < sizes.length; i++){
@@ -2272,17 +2319,43 @@ function shrinkLogo(file, cb){
 }
 function applyLogo(dataUrl){
   S.logo = dataUrl || '';
-  var img = $('#logoImg'), prev = $('#logoPrev'), add = $('#logoAdd');
+  var img = $('#logoImg'), prev = $('#logoPrev'), add = $('#logoAdd'), big = $('#shLogo');
   if (S.logo){
     img.src = S.logo; img.classList.add('on');
     prev.src = S.logo; prev.classList.add('on');
+    if (big){ big.src = S.logo; big.classList.add('on'); }
     if (add) add.style.display = 'none';
   } else {
     img.removeAttribute('src'); img.classList.remove('on');
     prev.removeAttribute('src'); prev.classList.remove('on');
+    if (big){ big.removeAttribute('src'); big.classList.remove('on'); }
     if (add) add.style.display = '';
   }
+  applyOrg();
   autosave();
+}
+
+/* 舞台顶上那一块。Logo 和公司名都没有就整块不显示,
+   有了之后要重新给总榜算高度 —— 它吃掉的那几十像素会让总榜溢出。 */
+function applyOrg(write){
+  var main = $('#orgMain'), sub = $('#orgSub');
+  if (write){
+    S.org = { main: (main.value || '').trim(), sub: (sub.value || '').trim() };
+  } else if (main) {
+    main.value = S.org.main || '';
+    sub.value  = S.org.sub  || '';
+  }
+  var box = $('#shOrg'), head = $('#stageHead');
+  if (!box || !head) return;
+  box.querySelector('b').textContent = S.org.main || '';
+  box.querySelector('span').textContent = S.org.sub || '';
+  box.classList.toggle('on', !!(S.org.main || S.org.sub));
+  head.classList.toggle('on', !!(S.logo || S.org.main || S.org.sub));
+
+  /* 这一块的高度会影响总榜能用多少地方,当场重算一次 */
+  var b = document.querySelector('.board');
+  if (b) fitBoard(b);
+  if (write) autosave();
 }
 
 /* ---------- 本机自动存档 (IndexedDB) ---------- */
@@ -2332,7 +2405,8 @@ function snapshot(){
   return {
     app:'lucky-draw', v:1, savedAt:new Date().toISOString(),
     tiers:S.tiers, pool:S.pool, winners:S.winners, history:S.history,
-    activeTier:S.activeTier, logo:S.logo || '', theme:S.theme || 'forge',
+    activeTier:S.activeTier, logo:S.logo || '', org:S.org || {main:'',sub:''},
+    theme:S.theme || 'forge',
     snd:{ on:A.on, vol:A.vol }
   };
 }
@@ -2372,7 +2446,10 @@ function bootRestore(){
       syncSoundBtn();
     }
     syncActive();
+    S.org = d.org && typeof d.org === 'object' ? { main: d.org.main || '', sub: d.org.sub || '' }
+                                               : { main:'', sub:'' };
     applyLogo(d.logo || '');
+    applyOrg();
     if (d.theme) applyTheme(d.theme);
     renderRail(); resetStage();
     restoring = false;
@@ -2394,7 +2471,8 @@ function saveProgress(){
   var data = {
     app:'lucky-draw', v:1, savedAt:new Date().toISOString(),
     tiers:S.tiers, pool:S.pool, winners:S.winners, history:S.history,
-    activeTier:S.activeTier, logo:S.logo || '', theme:S.theme || 'forge'
+    activeTier:S.activeTier, logo:S.logo || '', org:S.org || {main:'',sub:''},
+    theme:S.theme || 'forge'
   };
   var blob = new Blob([JSON.stringify(data)], {type:'application/json'});
   var a = document.createElement('a');
@@ -2421,7 +2499,10 @@ function restoreProgress(f){
       S.history = d.history || [];
       uid = Math.max.apply(null, S.tiers.map(function(t){ return t.id || 0; }).concat([0]));
       syncActive();
+      S.org = d.org && typeof d.org === 'object' ? { main: d.org.main || '', sub: d.org.sub || '' }
+                                                 : { main:'', sub:'' };
       applyLogo(d.logo || '');
+      applyOrg();
       if (d.theme) applyTheme(d.theme);
       renderRail(); resetStage();
       autosave();
@@ -2543,6 +2624,9 @@ $('#logoFile').onchange = function(e){
 $('#bClearLogo').onclick = function(){ applyLogo(''); toast('ลบโลโก้แล้ว · Logo 已清除'); };
 /* 左上角那块直接点就能换 —— 换公司时不用先进设置再找 */
 $('#logoImg').onclick = function(){ $('#logoFile').click(); };
+$('#shLogo').onclick = function(){ $('#logoFile').click(); };
+$('#orgMain').oninput = function(){ applyOrg(true); };
+$('#orgSub').oninput  = function(){ applyOrg(true); };
 $('#logoAdd').onclick = function(){ $('#logoFile').click(); };
 
 $('#fwOn').checked = FW.on;
@@ -2632,7 +2716,9 @@ $('#bClearStore').onclick = function(){
   DB.del().catch(function(){}).then(function(){
     S.pool = []; S.winners = []; S.history = [];
     S.tiers = defaultTiers();
+    S.org = { main:'', sub:'' };
     applyLogo('');
+    applyOrg();
     syncActive();
     renderRail(); resetStage();
     restoring = false;
@@ -2649,6 +2735,7 @@ renderVersion();
   try { t = localStorage.getItem(THEME_PREF) || 'forge'; } catch(e){}
   applyTheme(t);
 })();
+applyOrg();          // 把输入框和舞台那块对齐(没存档时就是空的)
 syncActive();
 renderRail();
 resetStage();

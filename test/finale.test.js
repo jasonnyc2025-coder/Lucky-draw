@@ -155,6 +155,30 @@ module.exports = async function run({ url }) {
               sz.nm + 'px / ' + sz.sub + 'px = ' + Math.round(sz.sub / sz.nm * 100) + '%');
     }
 
+    // ---------- 2.6 公司标识占的高度要从总榜里减掉 ----------
+    /* 不减的话总榜会溢出看不全 —— fitBoard 是按「可用高度」挑字号的。 */
+    {
+      const before = await page.evaluate(() => {
+        const b = document.querySelector('.board');
+        return { fits: b.scrollHeight <= b.clientHeight,
+                 bfs: getComputedStyle(b).getPropertyValue('--bfs').trim() };
+      });
+      await page.click('#bSetup'); await page.waitForTimeout(220);
+      await page.fill('#orgMain', 'บริษัท ทดสอบ จำกัด');
+      await page.fill('#orgSub', '测试公司');
+      await page.waitForTimeout(400);
+      await page.click('#vSetup [data-close]'); await page.waitForTimeout(500);
+      const after = await page.evaluate(() => {
+        const b = document.querySelector('.board');
+        return { head: getComputedStyle(document.querySelector('#stageHead')).display,
+                 fits: b.scrollHeight <= b.clientHeight,
+                 bfs: getComputedStyle(b).getPropertyValue('--bfs').trim() };
+      });
+      R.check('加上公司标识后总榜仍然一屏放得下(高度被算进去了)',
+              after.head === 'flex' && after.fits,
+              JSON.stringify(before) + ' → ' + JSON.stringify(after));
+    }
+
     // ---------- 3. 烟花 ----------
     const fw = await page.evaluate(() => ({
       on: document.querySelector('#fw').classList.contains('on'),

@@ -142,12 +142,56 @@ module.exports = async function run({ url }) {
               return opened;
             }));
 
+    // ---------- 舞台顶上的公司标识 ----------
+    R.check('舞台上的大 Logo 跟着一起换上',
+            await page.evaluate(() => document.querySelector('#shLogo').classList.contains('on')));
+    const bigH = await page.evaluate(() => ({
+      big: Math.round(document.querySelector('#shLogo').getBoundingClientRect().height),
+      bar: Math.round(document.querySelector('#logoImg').getBoundingClientRect().height),
+    }));
+    R.check('舞台上这张明显比顶栏那张大(投影上要看得见)',
+            bigH.big >= bigH.bar * 1.5, bigH.big + 'px vs 顶栏 ' + bigH.bar + 'px');
+
+    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await page.fill('#orgMain', 'บริษัท ตัวอย่าง จำกัด');
+    await page.fill('#orgSub', '示例公司');
+    await page.waitForTimeout(350);
+    await page.click('#vSetup [data-close]'); await page.waitForTimeout(250);
+    const org = await page.evaluate(() => {
+      const o = document.querySelector('#shOrg'), h = document.querySelector('#stageHead');
+      return {
+        head: getComputedStyle(h).display,
+        main: o.querySelector('b').textContent,
+        sub: o.querySelector('span').textContent,
+        /* Logo 和公司名之间那条竖线 */
+        line: getComputedStyle(o).borderLeftWidth,
+      };
+    });
+    R.check('公司名两行都显示在舞台上',
+            org.head === 'flex' && org.main === 'บริษัท ตัวอย่าง จำกัด' && org.sub === '示例公司',
+            JSON.stringify(org));
+    R.check('Logo 和公司名之间有一条竖线隔开',
+            parseFloat(org.line) > 0, 'border-left: ' + org.line);
+
+    // 滚动时要收起来,把高度让给名字
+    await page.click('#bNames'); await page.waitForTimeout(220);
+    await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
+    await page.click('#bApplyPaste'); await page.waitForTimeout(400);
+    await page.click('#bPour'); await page.waitForTimeout(900);
+    R.check('抽奖滚动时公司标识自动收起(高度全让给名字)',
+            await page.evaluate(() =>
+              getComputedStyle(document.querySelector('#stageHead')).display === 'none'));
+    await page.click('#bPour'); await page.waitForTimeout(4500);
+    R.check('揭晓后又回来',
+            await page.evaluate(() =>
+              getComputedStyle(document.querySelector('#stageHead')).display === 'flex'));
+
     // ---------- 换名单不该动 Logo 和主题 ----------
     await page.click('#bNames'); await page.waitForTimeout(250);
     await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
     await page.click('#bApplyPaste'); await page.waitForTimeout(400);
-    R.check('导入新名单不会动 Logo 和主题',
-            await page.evaluate(() => !!S.logo && S.theme === 'gala'));
+    R.check('导入新名单不会动 Logo、公司名和主题',
+            await page.evaluate(() => !!S.logo && S.theme === 'gala' && !!S.org.main));
 
     // ---------- 关掉页面重开 ----------
     await page.close();
@@ -159,19 +203,24 @@ module.exports = async function run({ url }) {
       theme: S.theme, attr: document.documentElement.getAttribute('data-theme'),
       logo: !!S.logo, on: document.querySelector('#logoImg').classList.contains('on'),
       meta: document.querySelector('meta[name="theme-color"]').content,
+      org: S.org.main, orgInput: document.querySelector('#orgMain').value,
+      head: getComputedStyle(document.querySelector('#stageHead')).display,
     }));
-    R.check('关掉页面重开,主题和 Logo 都还在',
-            st.theme === 'gala' && st.attr === 'gala' && st.logo && st.on, JSON.stringify(st));
+    R.check('关掉页面重开,主题、Logo、公司名都还在',
+            st.theme === 'gala' && st.attr === 'gala' && st.logo && st.on &&
+            st.org === 'บริษัท ตัวอย่าง จำกัด' && st.orgInput === st.org && st.head === 'flex',
+            JSON.stringify(st));
     R.check('重开时状态栏颜色也对(head 里那段防闪的代码生效了)',
             st.meta === '#2B0F10', st.meta);
 
     // ---------- 保存进度的 .json 里要带主题 ----------
     const prog = await p2.evaluate(() => {
       const d = snapshot();
-      return { theme: d.theme, hasLogo: !!d.logo };
+      return { theme: d.theme, hasLogo: !!d.logo, org: (d.org || {}).main };
     });
-    R.check('「保存进度」的文件里带着主题和 Logo,换台电脑能原样恢复',
-            prog.theme === 'gala' && prog.hasLogo, JSON.stringify(prog));
+    R.check('「保存进度」的文件里带着主题、Logo 和公司名,换台电脑能原样恢复',
+            prog.theme === 'gala' && prog.hasLogo && prog.org === 'บริษัท ตัวอย่าง จำกัด',
+            JSON.stringify(prog));
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
