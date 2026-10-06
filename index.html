@@ -498,6 +498,22 @@ td input{padding:9px 10px;font-size:15px}
 .wlist{max-height:400px;overflow-y:auto}
 .wgrp{margin-bottom:20px}
 .wgrp-h{font-family:var(--f-util);font-size:14px;letter-spacing:.14em;color:var(--pour);margin-bottom:11px}
+/* 名单搜索。107 个人滚起来找一个很累,而且列表最多只画 300 条 ——
+   搜索是在**全部**人里面找,不受那 300 条的限制。 */
+.psearch{position:relative;margin-top:14px}
+.psearch input{
+  width:100%;padding:12px 40px 12px 14px;font-size:16px;
+  background:var(--slag);border:1px solid var(--line);border-radius:4px;color:var(--bone);
+}
+.psearch input::placeholder{color:var(--ash);opacity:.75}
+.psearch input:focus{border-color:var(--pour);outline:none}
+.pclear{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  width:30px;height:30px;border-radius:3px;font-size:20px;line-height:1;color:var(--ash);
+}
+.pclear:hover{color:var(--pour)}
+.pinfo mark{background:none;color:var(--pour);font-weight:700}
+.pempty{margin-top:12px}
 .plist{
   display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,215px),1fr));
   max-height:320px;overflow-y:auto;overscroll-behavior:contain;margin-top:10px;
@@ -615,7 +631,13 @@ td input{padding:9px 10px;font-size:15px}
           <button class="act" id="bAddPerson">+ เพิ่มคน<small>添加一人</small></button>
           <button class="act danger" id="bClearPool">🗑 ล้างรายชื่อทั้งหมด<small>清空名单</small></button>
         </div>
+        <div class="psearch" id="psearchWrap">
+          <input type="text" id="poolSearch" autocomplete="off"
+                 placeholder="ค้นหาชื่อหรือรหัส · 搜索姓名或工号">
+          <button class="pclear" id="bClearSearch" title="ล้าง 清空" style="display:none">×</button>
+        </div>
         <div class="plist" id="plist"></div>
+        <p class="hint pempty" id="poolEmpty" style="display:none"></p>
         <div class="notes">
           <div class="note"><span class="k">【+ เพิ่มคน · 添加一人】</span>
             <span class="v">เพิ่มทีละคน · 临时来人直接加一个,不用重新导整份名单。</span></div>
@@ -823,7 +845,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v34';
+var APP_VERSION = 'v35';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1870,6 +1892,21 @@ function renderTierRows(){
   });
 }
 
+/* 把命中的那一段用 <mark> 标出来。全程用 textContent,不拼 HTML ——
+   名字是用户自己导进来的,拼字符串会被名字里的尖括号冲掉版面。 */
+function hilite(tag, text, q){
+  var e = document.createElement(tag);
+  text = String(text == null ? '' : text);
+  var at = q ? text.toLowerCase().indexOf(q) : -1;
+  if (at < 0){ e.textContent = text; return e; }
+  e.appendChild(document.createTextNode(text.slice(0, at)));
+  var m = document.createElement('mark');
+  m.textContent = text.slice(at, at + q.length);
+  e.appendChild(m);
+  e.appendChild(document.createTextNode(text.slice(at + q.length)));
+  return e;
+}
+
 /* ---------- 当前名单 ---------- */
 var PLIST_CAP = 300;          // 名单很大时只画前 300 条,避免开面板卡顿
 function renderPoolList(){
@@ -1883,24 +1920,51 @@ function renderPoolList(){
                     '<span>ยังไม่มีรายชื่อ · 还没有导入名单,用下面的方式导入(Excel / CSV / PDF / 直接粘贴)。</span>';
     return;
   }
-  sum.innerHTML = '<span class="k">【จำนวน · 人数】</span><span>รวม <b style="color:var(--pour)">' +
-                  total + '</b> คน · 共 <b style="color:var(--pour)">' + total + '</b> 人 · ' +
-                  S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖' +
-                  (total > PLIST_CAP ? ' · 下面只列出前 ' + PLIST_CAP + ' 条' : '') + '</span>';
+  /* 待抽的排前面,已中奖的排后面并打勾。
+     idx 直接记在每一项上 —— 以前是靠它在数组里的位置倒推的,
+     一搜索(列表被过滤)那个推算就全错了,改名会改到别人头上。 */
+  var all = S.pool.map(function(p, i){ return { p:p, won:false, idx:i }; })
+    .concat(S.winners.map(function(w, i){ return { p:w, won:true, idx:i }; }));
 
-  /* 待抽的排前面,已中奖的排后面并打勾 */
-  var all = S.pool.map(function(p){ return { p:p, won:false }; })
-    .concat(S.winners.map(function(w){ return { p:w, won:true }; }));
+  var q = ($('#poolSearch') ? $('#poolSearch').value : '').trim().toLowerCase();
+  var hits = q ? all.filter(function(x){
+    return String(x.p.name || '').toLowerCase().indexOf(q) >= 0 ||
+           String(x.p.sub  || '').toLowerCase().indexOf(q) >= 0;
+  }) : all;
 
-  all.slice(0, PLIST_CAP).forEach(function(x, i){
+  var clr = $('#bClearSearch');
+  if (clr) clr.style.display = q ? '' : 'none';
+
+  if (q){
+    sum.innerHTML = '<span class="k">【ค้นหา · 搜索】</span><span>在全部 ' + total +
+                    ' 人里找到 <b style="color:var(--pour)">' + hits.length + '</b> 人' +
+                    (hits.length > PLIST_CAP ? ' · 只列出前 ' + PLIST_CAP + ' 条' : '') + '</span>';
+  } else {
+    sum.innerHTML = '<span class="k">【จำนวน · 人数】</span><span>รวม <b style="color:var(--pour)">' +
+                    total + '</b> คน · 共 <b style="color:var(--pour)">' + total + '</b> 人 · ' +
+                    S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖' +
+                    (total > PLIST_CAP ? ' · 下面只列出前 ' + PLIST_CAP + ' 条' : '') + '</span>';
+  }
+
+  var none = $('#poolEmpty');
+  if (none){
+    if (q && !hits.length){
+      none.style.display = '';
+      none.textContent = 'ไม่พบ · 没有找到「' + q + '」。试试只打名字的一部分,或者工号的后几位。';
+    } else {
+      none.style.display = 'none';
+    }
+  }
+
+  hits.slice(0, PLIST_CAP).forEach(function(x){
     var r = el('div','prow' + (x.won ? ' won' : ''));
     var info = el('div','pinfo');
-    info.appendChild(el('b', null, x.p.name));
-    if (x.p.sub) info.appendChild(el('span', null, x.p.sub));
+    info.appendChild(hilite('b', x.p.name, q));
+    if (x.p.sub) info.appendChild(hilite('span', x.p.sub, q));
     r.appendChild(info);
 
     var kind = x.won ? 'winner' : 'pool';
-    var idx  = x.won ? i - S.pool.length : i;
+    var idx  = x.idx;
 
     var ed = el('button','pbtn','✎');
     ed.title = 'แก้ไข 改名';
@@ -2435,6 +2499,15 @@ $('#bApplyPaste').onclick = function(){
   $('#vNames').classList.remove('on');
 };
 
+$('#poolSearch').oninput = renderPoolList;
+$('#poolSearch').onkeydown = function(e){
+  if (e.key === 'Escape'){ e.stopPropagation(); this.value = ''; renderPoolList(); }
+};
+$('#bClearSearch').onclick = function(){
+  $('#poolSearch').value = '';
+  renderPoolList();
+  $('#poolSearch').focus();
+};
 $('#bAddPerson').onclick = addPerson;
 $('#bClearPool').onclick = clearRoster;
 

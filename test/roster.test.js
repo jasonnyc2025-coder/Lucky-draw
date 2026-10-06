@@ -150,6 +150,75 @@ module.exports = async function run({ url }) {
             reopened.includes('改过的名字/ZZZ') && !reopened.some(x => x.startsWith('王芳')),
             reopened.join(', '));
 
+    // ---------- 8.5 搜索 ----------
+    const p9 = await ctx.newPage();
+    p9.on('pageerror', e => errs.push(e.message));
+    let reply9 = null;
+    p9.on('dialog', d => {
+      if (d.type() === 'prompt' && reply9 !== null) d.accept(reply9); else d.accept();
+    });
+    await p9.goto(url, { waitUntil: 'load' });
+    await p9.waitForTimeout(1400);
+
+    /* 塞一份比「只画前 300 条」更长的名单,验证搜索是在全部人里找 */
+    await p9.evaluate(() => {
+      S.pool = []; S.winners = []; S.history = [];
+      for (let i = 0; i < 320; i++) S.pool.push({ name: '路人' + i, sub: 'Z' + i });
+      S.pool.push({ name: 'สมชาย ใจดี', sub: '01049' });
+      S.pool.push({ name: '末尾的人', sub: 'LAST9' });
+      syncActive(); renderPoolList(); renderRail(); updateControls(); autosave();
+    });
+    await p9.click('#bNames'); await p9.waitForTimeout(300);
+
+    const probe = async (q) => {
+      await p9.fill('#poolSearch', q);
+      await p9.waitForTimeout(250);
+      return p9.evaluate(() => ({
+        rows: document.querySelectorAll('#plist .prow').length,
+        sum: document.querySelector('#poolSummary').textContent.trim(),
+        empty: document.querySelector('#poolEmpty').style.display !== 'none',
+        marks: [...document.querySelectorAll('#plist mark')].map(m => m.textContent),
+      }));
+    };
+
+    let r9 = await probe('');
+    R.check('不搜索时最多画 300 条(名单很大也不卡)',
+            r9.rows === 300 && /共\s*322\s*人/.test(r9.sum), r9.sum);
+
+    r9 = await probe('01049');
+    R.check('按工号能搜到', r9.rows === 1 && /找到 1 人/.test(r9.sum), r9.sum);
+    R.check('命中的那几个字会标出来', r9.marks.indexOf('01049') >= 0, JSON.stringify(r9.marks));
+
+    r9 = await probe('สมชาย');
+    R.check('按姓名能搜到(泰文)', r9.rows === 1, r9.sum);
+
+    r9 = await probe('LAST9');
+    R.check('排在 300 条之后的人也搜得到(搜索不受列表上限限制)',
+            r9.rows === 1 && /找到 1 人/.test(r9.sum), r9.sum);
+
+    r9 = await probe('zzzzzz');
+    R.check('搜不到时说清楚,而不是一片空白',
+            r9.rows === 0 && r9.empty, r9.sum);
+
+    /* 关键回归:搜索把列表过滤掉了,改名/删除必须作用在搜到的那个人身上。
+       原来的 idx 是靠「它排在列表第几位」倒推的,一过滤就会改到别人头上。 */
+    await probe('LAST9');
+    reply9 = '改对了, LAST9';
+    await p9.click('#plist .prow:nth-child(1) .pbtn:not(.del)');
+    await p9.waitForTimeout(350);
+    const edited = await p9.evaluate(() => ({
+      target: (S.pool.filter(x => x.sub === 'LAST9')[0] || {}).name,
+      first: S.pool[0].name,
+    }));
+    R.check('搜索状态下改名,改的是搜到的那个人,不是列表第一个',
+            edited.target === '改对了' && edited.first === '路人0', JSON.stringify(edited));
+
+    await p9.click('#bClearSearch'); await p9.waitForTimeout(250);
+    R.check('点 × 清空搜索,列表回到全部',
+            await p9.evaluate(() => document.querySelector('#plist .prow').textContent.indexOf('路人0') >= 0 &&
+                                    document.querySelector('#poolSearch').value === ''));
+    await p9.close();
+
     // ---------- 9. 一键清空名单 ----------
     const p3 = await ctx.newPage();
     p3.on('pageerror', e => errs.push(e.message));
