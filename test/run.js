@@ -14,6 +14,7 @@ const SUITES = {
   assets: require('./assets.test.js'),
   audio: require('./audio.test.js'),
   edge: require('./edge.test.js'),
+  theme: require('./theme.test.js'),
 };
 
 (async () => {

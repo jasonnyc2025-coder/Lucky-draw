@@ -20,11 +20,12 @@ npm run test:storage    # 本机存档
 npm run test:assets     # 版本号和图标(不开浏览器,秒出)
 npm run test:audio      # 音效
 npm run test:edge       # 边角情况
+npm run test:theme      # 配色和 Logo
 ```
 
 全部通过时退出码 0,有失败是 1,可以直接接 CI。
 
-## 七个套件
+## 八个套件
 
 | 文件 | 覆盖 |
 |---|---|
@@ -35,6 +36,7 @@ npm run test:edge       # 边角情况
 | `assets.test.js` | 不开浏览器,纯读文件:两个版本号是否一起加了、图标 `?r=` 三处是否一致、引用到的图标是否都在、maskable 和标准图是否真的是两张 |
 | `audio.test.js` | 合成器里有没有混进 square / sawtooth、主输出的柔化链在不在、连抽三轮后振荡器和定时器有没有收干净 |
 | `edge.test.js` | 名额比人多、只剩一个人、猛点按钮、连按空格、导入时的重复行 |
+| `theme.test.js` | 三套配色的对比度(每一组都要 ≥ 7:1)、切换后状态栏颜色、Logo 一键换、大图自动缩、关掉页面重开还在 |
 
 ## 关于 PDF 测试
 

@@ -6,6 +6,21 @@
 <title>จับรางวัล · 抽奖</title>
 <link rel="manifest" href="./manifest.webmanifest?r=2">
 <meta name="theme-color" content="#221C19">
+<script>
+/* 在页面画出来之前就把主题属性加上,否则会先闪一下默认的暖炭色再变。
+   这段必须放在样式表之前、且不能依赖后面的任何代码。 */
+(function(){
+  try{
+    var t = localStorage.getItem('lucky-draw.theme');
+    var bar = {forge:'#221C19', gala:'#2B0F10', ink:'#1C212A'}[t];
+    if (bar){
+      if (t !== 'forge') document.documentElement.setAttribute('data-theme', t);
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', bar);
+    }
+  }catch(e){}
+})();
+</script>
 <meta name="description" content="ระบบจับรางวัลสองภาษา ไทย-จีน · 泰中双语抽奖系统">
 <!-- 界面本来就是泰文 + 中文双语。Chrome 看到 lang="th" 会自动翻成手机系统语言,
      把中文那半也一并重写(「PDF 只能读出文字版的内容」会变成一串乱七八糟的
@@ -27,24 +42,42 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
-  /* 底色。想换风格只改这 6 行,其余全部跟着走。
-     备选 B 中性炭灰:#26241F / #312E29 / #3D3931 / #605A50 / #C3BCB0 / #F0ECE4
-     备选 C 墨蓝    :#1C212A / #252C37 / #2F3846 / #4C5A6B / #B6BEC9 / #E9EEF4 */
-  --slag:#221C19;
-  --shell:#2C2521;
-  --shell-2:#382F29;
-  --line:#5C4C42;
-  --ash:#C0B5AA;
-  --bone:#EFE8E0;
-  --pour:#FF8A1F;
-  --whitehot:#FFE9C4;
-  --warn:#E2645A;
-  --steel-hi:#DDE2E6;
-  --steel-lo:#9AA2A9;
+  /* ===== 主题 ===== 换风格只改这一段,整个界面跟着走。
+     在 <html data-theme="..."> 上切换,下面还有「年会红金」和「墨蓝」两套。
+     改配色前先量对比度 —— 投影场合正文建议 7:1 以上(见 design/themes.md)。 */
+  --slag:#221C19;        /* 页面底色 */
+  --shell:#2C2521;       /* 面板、卡片 */
+  --shell-2:#382F29;     /* 面板里的小节 */
+  --line:#5C4C42;        /* 描边、分隔线 */
+  --ash:#C0B5AA;         /* 次级文字 */
+  --bone:#EFE8E0;        /* 正文 */
+  --pour:#FF8A1F;        /* 强调色 */
+  --whitehot:#FFE9C4;    /* 高亮 */
+  --warn:#E2645A;        /* 危险操作 */
+  --steel-hi:#DDE2E6;    /* 中奖卡渐变(亮) */
+  --steel-lo:#9AA2A9;    /* 中奖卡渐变(暗) */
+  --cast-edge:#EFF3F6;   /* 中奖卡描边 */
+  --ink:#171310;         /* 中奖卡上的字 */
+  --glow:255,138,31;     /* 辉光/点按反馈的 RGB,要和 --pour 同色系 */
 
   --f-display:'Kanit',system-ui,sans-serif;
   --f-util:'Chakra Petch','Kanit',system-ui,sans-serif;
   --f-cn:'Noto Sans SC','Kanit',system-ui,sans-serif;
+}
+
+/* 年会红金 —— 测过对比度,每一项都比默认的暖炭更高(大标题 16.4:1) */
+:root[data-theme="gala"]{
+  --slag:#2B0F10; --shell:#3B1718; --shell-2:#4A1F1E; --line:#7E3D33;
+  --ash:#E3C9A6;  --bone:#FFF4E3;  --pour:#F3C44C;    --whitehot:#FFEFC2;
+  --warn:#FF8E7E; --steel-hi:#FBE7B4; --steel-lo:#D8AE48;
+  --cast-edge:#FFF6DC; --ink:#2A1403; --glow:243,196,76;
+}
+/* 墨蓝 —— 冷静、偏商务 */
+:root[data-theme="ink"]{
+  --slag:#1C212A; --shell:#252C37; --shell-2:#2F3846; --line:#4C5A6B;
+  --ash:#B6BEC9;  --bone:#E9EEF4;  --pour:#6FBBFF;    --whitehot:#D8ECFF;
+  --warn:#FF8E8E; --steel-hi:#E3EAF1; --steel-lo:#A3B0BF;
+  --cast-edge:#F4F8FC; --ink:#101418; --glow:111,187,255;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -64,7 +97,7 @@ body{
 }
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:radial-gradient(130% 74% at 50% 110%, rgba(255,138,31,.10), transparent 62%);
+  background:radial-gradient(130% 74% at 50% 110%, rgba(var(--glow),.10), transparent 62%);
 }
 .cn{font-family:var(--f-cn)}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
@@ -99,12 +132,41 @@ input,select{font:inherit;color:inherit}
   transition:.18s;white-space:nowrap;
 }
 .tbtn.icon{font-size:19px;padding:11px 15px;line-height:1}
-.tbtn:hover{color:var(--whitehot);border-color:var(--pour);background:rgba(255,138,31,.14)}
-.tbtn:active{background:rgba(255,138,31,.24)}
+.tbtn:hover{color:var(--whitehot);border-color:var(--pour);background:rgba(var(--glow),.14)}
+.tbtn:active{background:rgba(var(--glow),.24)}
 .tbtn:focus-visible{outline:2px solid var(--pour);outline-offset:2px}
 .tbtn.muted{color:#8D7D6F;border-color:#453931}
 .logo-prev{max-height:70px;max-width:230px;object-fit:contain;background:var(--slag);border:1px solid var(--line);border-radius:3px;padding:8px;display:none}
 .logo-prev.on{display:block}
+.themes{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.theme{
+  display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;
+  padding:13px 14px;border:1px solid var(--line);border-radius:4px;
+  background:var(--slag);transition:.16s;
+}
+.theme b{font-family:var(--f-util);font-size:15px;font-weight:600;color:var(--bone)}
+.theme em{font-style:normal;font-size:12.5px;color:var(--ash)}
+.theme .sw{display:flex;gap:4px;margin-bottom:5px}
+.theme .sw i{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+.theme:hover{border-color:var(--ash)}
+.theme.on{border-color:var(--pour);box-shadow:inset 0 0 0 1px var(--pour)}
+.theme.on b::after{content:' ✓';color:var(--pour)}
+/* 左上角没有 Logo 时,那里是一个可以直接点的上传位。
+   尺寸必须和 Logo 本身(38px 高)一样 —— 做大一点点顶栏就会多折一行,
+   舞台矮 48px,结束总榜的字号会被挤小一档。 */
+.logo-add{
+  flex:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;line-height:1;color:var(--ash);
+  border:1px dashed var(--line);border-radius:3px;cursor:pointer;transition:.16s;
+}
+.logo-add:hover{color:var(--pour);border-color:var(--pour)}
+.logo-add+.brand{border-left:1px solid var(--line);padding-left:16px}
+/* 窄屏的顶栏本来就排得很满,再多这一个方块就会折出一行,
+   舞台矮一截、结束总榜的字号被挤小一档。这种宽度下只能去设置里传 Logo。
+   (已经传了 Logo 的话那张图照常显示 —— 那是用户自己选的。) */
+@media (max-width:900px){ .logo-add{display:none} }
+.logo{cursor:pointer}
+.app.focus .logo-add{display:none}
 
 /* ---------- body grid ---------- */
 .main{flex:1;display:grid;grid-template-columns:264px 1fr;min-height:0}
@@ -140,7 +202,7 @@ input,select{font:inherit;color:inherit}
 }
 .heat{
   position:absolute;left:0;right:0;bottom:0;top:0;pointer-events:none;
-  background:radial-gradient(78% 62% at 50% 106%, rgba(255,138,31,.55), transparent 70%);
+  background:radial-gradient(78% 62% at 50% 106%, rgba(var(--glow),.55), transparent 70%);
   opacity:0;transition:opacity .4s;
 }
 .crucible.hot .heat{
@@ -205,12 +267,12 @@ input,select{font:inherit;color:inherit}
 .ingot.molten{
   background:linear-gradient(168deg,#FFF6E4,#FFB44A 55%,#FF7A0D);
   border-color:#FFD79A;color:#2A1706;
-  box-shadow:0 0 90px rgba(255,138,31,.55), inset 0 1px 0 rgba(255,255,255,.7);
+  box-shadow:0 0 90px rgba(var(--glow),.55), inset 0 1px 0 rgba(255,255,255,.7);
 }
 /* cooled */
 .ingot.cast{
   background:linear-gradient(168deg,var(--steel-hi),var(--steel-lo));
-  border-color:#EFF3F6;color:#171310;
+  border-color:var(--cast-edge);color:var(--ink);
   box-shadow:0 14px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.85);
 }
 .ingot.cast.still::after{content:none}
@@ -255,7 +317,7 @@ input,select{font:inherit;color:inherit}
 /* 压轴那一档用铸钢的样子,和揭晓时的卡片呼应 */
 .bgrp.top .bname{
   background:linear-gradient(168deg,var(--steel-hi),var(--steel-lo));
-  border-color:#EFF3F6;border-left-color:#fff;color:#171310;
+  border-color:var(--cast-edge);border-left-color:#fff;color:var(--ink);
   box-shadow:0 6px 20px rgba(0,0,0,.4);
 }
 .bgrp.top .bname span{color:#3B3833}
@@ -270,9 +332,9 @@ input,select{font:inherit;color:inherit}
   position:relative;min-width:290px;padding:19px 40px;border-radius:3px;
   font-family:var(--f-util);font-weight:700;font-size:22px;letter-spacing:.16em;
   background:var(--pour);color:#1A0E03;transition:.16s;
-  box-shadow:0 0 0 1px rgba(255,233,196,.35), 0 10px 34px rgba(255,138,31,.3);
+  box-shadow:0 0 0 1px rgba(255,233,196,.35), 0 10px 34px rgba(var(--glow),.3);
 }
-.pour:hover:not(:disabled){background:var(--whitehot);box-shadow:0 0 0 1px #fff,0 12px 44px rgba(255,138,31,.5)}
+.pour:hover:not(:disabled){background:var(--whitehot);box-shadow:0 0 0 1px #fff,0 12px 44px rgba(var(--glow),.5)}
 .pour:focus-visible{outline:3px solid var(--whitehot);outline-offset:3px}
 .pour:disabled{background:#3E322A;color:#B5A294;box-shadow:inset 0 0 0 1px #57483E;cursor:not-allowed}
 .pour.stop{background:var(--whitehot);animation:pulse .85s ease-in-out infinite}
@@ -346,7 +408,7 @@ input,select{font:inherit;color:inherit}
 .act{
   flex:1 1 210px;font-family:var(--f-util);font-size:17px;font-weight:600;letter-spacing:.05em;
   padding:16px 18px;border-radius:3px;border:1px solid var(--pour);color:var(--pour);
-  background:rgba(255,138,31,.08);transition:.16s;
+  background:rgba(var(--glow),.08);transition:.16s;
 }
 .act:hover{background:var(--pour);color:#1A0E03}
 .act:focus-visible{outline:2px solid var(--whitehot);outline-offset:2px}
@@ -365,7 +427,7 @@ input,select{font:inherit;color:inherit}
 .drop{
   border:1px dashed var(--line);border-radius:3px;padding:26px;text-align:center;transition:.18s;
 }
-.drop.over{border-color:var(--pour);background:rgba(255,138,31,.06)}
+.drop.over{border-color:var(--pour);background:rgba(var(--glow),.06)}
 .drop p{font-size:16px;color:var(--ash);margin-top:10px}
 .filepick{
   display:inline-block;font-family:var(--f-util);font-weight:600;font-size:15px;letter-spacing:.1em;
@@ -480,7 +542,8 @@ td input{padding:9px 10px;font-size:15px}
 <div class="app">
 
   <header class="topbar">
-    <img class="logo" id="logoImg" alt="">
+    <img class="logo" id="logoImg" alt="" title="เปลี่ยนโลโก้ · 点一下换 Logo">
+    <label class="logo-add" id="logoAdd" title="อัปโหลดโลโก้ · 上传公司 Logo — 点一下选图">＋</label>
     <div class="brand">
       <b>จับรางวัล</b>
       <span class="cn">幸运抽奖</span>
@@ -663,13 +726,38 @@ td input{padding:9px 10px;font-size:15px}
       </div>
 
       <div class="sec">
+        <div class="sec-h">ธีมสี · 配色主题</div>
+        <div class="themes" id="themes">
+          <button class="theme" data-t="forge">
+            <span class="sw"><i style="background:#221C19"></i><i style="background:#FF8A1F"></i><i style="background:#EFE8E0"></i></span>
+            <b>เตาหลอม 暖炭</b><em>默认 · 稳重</em>
+          </button>
+          <button class="theme" data-t="gala">
+            <span class="sw"><i style="background:#2B0F10"></i><i style="background:#F3C44C"></i><i style="background:#FFF4E3"></i></span>
+            <b>งานเลี้ยง 年会红金</b><em>喜庆 · 对比最高</em>
+          </button>
+          <button class="theme" data-t="ink">
+            <span class="sw"><i style="background:#1C212A"></i><i style="background:#6FBBFF"></i><i style="background:#E9EEF4"></i></span>
+            <b>หมึก 墨蓝</b><em>冷静 · 商务</em>
+          </button>
+        </div>
+        <p class="hint">三套都量过对比度,投影上都看得清(正文 13:1 以上)。<br>
+        <b style="color:var(--pour)">年会用「红金」</b> —— 喜庆,而且是三套里对比度最高的一套。<br>
+        背景不支持放照片:舞台大标题、奖项列表、总榜的分组标题都是直接压在背景上的,
+        照片一上去这些字就看不清了,投影仪比手机屏幕更糟。</p>
+      </div>
+
+      <div class="sec">
         <div class="sec-h">โลโก้บริษัท · 公司 Logo</div>
         <div class="row">
-          <label class="filepick">เลือกรูป 选择图片<input type="file" id="logoFile" accept="image/*" hidden></label>
+          <label class="filepick">เลือกรูป 上传 / 更换 Logo<input type="file" id="logoFile" accept="image/*" hidden></label>
           <button class="ghost" id="bClearLogo">ลบ 清除</button>
           <img class="logo-prev" id="logoPrev" alt="">
         </div>
-        <p class="hint">建议用透明底 PNG,高度 80px 以上。显示在左上角,全屏投影时一起出现。</p>
+        <p class="hint"><b style="color:var(--pour)">换公司最快的办法</b>:直接点左上角那个 Logo(还没传过的话,宽屏上那里是一个虚线的「＋」方块),
+        马上就能选新图,不用进设置。手机那种窄屏顶栏排不下,就从这里传。<br>
+        建议透明底 PNG。图片会自动缩到高 256px 再存,所以手机直接拍的大图、几 MB 的原图都能传,不用自己压。<br>
+        Logo 存在这台设备上,换名单、清空名单都不会丢;「清除本机数据」才会连它一起删。</p>
       </div>
 
       <div class="sec">
@@ -697,7 +785,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v29';
+var APP_VERSION = 'v30';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -722,6 +810,7 @@ var S = {
   fileRows: null,
   fromPdf: false,
   logo: '',
+  theme: 'forge',
   frame: null,       // 滚动时屏幕上正显示的这一组人 —— 按下停止就是他们中奖
   shown: null,       // 当前屏上已揭晓的人,resize 时用来重画而不是清空
   revealing: false   // 揭晓动画进行中,期间忽略 resize
@@ -1823,16 +1912,72 @@ function exportCSV(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
 }
 
+/* ---------- 配色主题 ---------- */
+var THEME_PREF = 'lucky-draw.theme';
+var THEMES = {
+  forge: { bar:'#221C19', zh:'暖炭' },
+  gala:  { bar:'#2B0F10', zh:'年会红金' },
+  ink:   { bar:'#1C212A', zh:'墨蓝' }
+};
+function applyTheme(name, save){
+  if (!THEMES[name]) name = 'forge';
+  S.theme = name;
+  /* forge 是 :root 本身的默认值,不设 data-theme 属性 */
+  if (name === 'forge') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', name);
+
+  /* 手机状态栏/启动画面的颜色也得跟着换,不然装成 App 后顶上会多出一条旧色 */
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', THEMES[name].bar);
+
+  var box = $('#themes');
+  if (box){
+    [].forEach.call(box.querySelectorAll('.theme'), function(b){
+      b.classList.toggle('on', b.getAttribute('data-t') === name);
+    });
+  }
+  try { localStorage.setItem(THEME_PREF, name); } catch(e){}
+  if (save) autosave();
+}
+
 /* ---------- logo ---------- */
+/* 大图自动缩到高 256px 再存。顶栏只显示 38px、预览 70px,存原图纯属浪费 ——
+   而且 Logo 是 base64 存进 IndexedDB 的,原图几 MB 的话存档会很笨重。
+   缩完再存,用户就不用自己去压图了。 */
+var LOGO_MAX_H = 256;
+function shrinkLogo(file, cb){
+  var r = new FileReader();
+  r.onerror = function(){ cb(null); };
+  r.onload = function(ev){
+    var src = ev.target.result;
+    var im = new Image();
+    im.onerror = function(){ cb(null); };
+    im.onload = function(){
+      if (!im.height || im.height <= LOGO_MAX_H){ cb(src); return; }
+      try {
+        var k = LOGO_MAX_H / im.height;
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.width * k));
+        c.height = LOGO_MAX_H;
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        cb(c.toDataURL('image/png'));        // PNG:保留透明底
+      } catch(e){ cb(src); }                 // 画不了(比如 SVG 带外链)就用原图
+    };
+    im.src = src;
+  };
+  r.readAsDataURL(file);
+}
 function applyLogo(dataUrl){
   S.logo = dataUrl || '';
-  var img = $('#logoImg'), prev = $('#logoPrev');
+  var img = $('#logoImg'), prev = $('#logoPrev'), add = $('#logoAdd');
   if (S.logo){
     img.src = S.logo; img.classList.add('on');
     prev.src = S.logo; prev.classList.add('on');
+    if (add) add.style.display = 'none';
   } else {
     img.removeAttribute('src'); img.classList.remove('on');
     prev.removeAttribute('src'); prev.classList.remove('on');
+    if (add) add.style.display = '';
   }
   autosave();
 }
@@ -1884,7 +2029,7 @@ function snapshot(){
   return {
     app:'lucky-draw', v:1, savedAt:new Date().toISOString(),
     tiers:S.tiers, pool:S.pool, winners:S.winners, history:S.history,
-    activeTier:S.activeTier, logo:S.logo || '',
+    activeTier:S.activeTier, logo:S.logo || '', theme:S.theme || 'forge',
     snd:{ on:A.on, vol:A.vol }
   };
 }
@@ -1925,6 +2070,7 @@ function bootRestore(){
     }
     syncActive();
     applyLogo(d.logo || '');
+    if (d.theme) applyTheme(d.theme);
     renderRail(); resetStage();
     restoring = false;
     var t = new Date(d.savedAt || Date.now());
@@ -1945,7 +2091,7 @@ function saveProgress(){
   var data = {
     app:'lucky-draw', v:1, savedAt:new Date().toISOString(),
     tiers:S.tiers, pool:S.pool, winners:S.winners, history:S.history,
-    activeTier:S.activeTier, logo:S.logo || ''
+    activeTier:S.activeTier, logo:S.logo || '', theme:S.theme || 'forge'
   };
   var blob = new Blob([JSON.stringify(data)], {type:'application/json'});
   var a = document.createElement('a');
@@ -1973,6 +2119,7 @@ function restoreProgress(f){
       uid = Math.max.apply(null, S.tiers.map(function(t){ return t.id || 0; }).concat([0]));
       syncActive();
       applyLogo(d.logo || '');
+      if (d.theme) applyTheme(d.theme);
       renderRail(); resetStage();
       autosave();
       $('#progNote').textContent = '已恢复 · ' + S.winners.length + ' 中奖 / ' + S.pool.length + ' 待抽';
@@ -2074,13 +2221,26 @@ $('#progFile').onchange = function(e){ restoreProgress(e.target.files[0]); e.tar
 
 $('#logoFile').onchange = function(e){
   var f = e.target.files[0]; if (!f) return;
-  if (f.size > 2 * 1024 * 1024){ toast('รูปใหญ่เกินไป · 图片超过 2MB,请压缩后再传'); return; }
-  var r = new FileReader();
-  r.onload = function(ev){ applyLogo(ev.target.result); toast('โลโก้พร้อมแล้ว · Logo 已设置'); };
-  r.readAsDataURL(f);
   e.target.value = '';
+  if (f.size > 20 * 1024 * 1024){ toast('ไฟล์ใหญ่เกินไป · 文件超过 20MB,换一张小一点的'); return; }
+  shrinkLogo(f, function(url){
+    if (!url){ toast('อ่านรูปไม่ได้ · 这张图读不出来,换一张试试(PNG / JPG)'); return; }
+    applyLogo(url);
+    toast('โลโก้พร้อมแล้ว · Logo 已换好');
+  });
 };
-$('#bClearLogo').onclick = function(){ applyLogo(''); };
+$('#bClearLogo').onclick = function(){ applyLogo(''); toast('ลบโลโก้แล้ว · Logo 已清除'); };
+/* 左上角那块直接点就能换 —— 换公司时不用先进设置再找 */
+$('#logoImg').onclick = function(){ $('#logoFile').click(); };
+$('#logoAdd').onclick = function(){ $('#logoFile').click(); };
+
+$('#themes').onclick = function(e){
+  var b = e.target.closest ? e.target.closest('.theme') : null;
+  if (!b) return;
+  var t = b.getAttribute('data-t');
+  applyTheme(t, true);
+  toast('เปลี่ยนธีมแล้ว · 已换成「' + THEMES[t].zh + '」');
+};
 
 function syncSoundBtn(){
   var b = $('#bSound');
@@ -2163,6 +2323,13 @@ $('#bClearStore').onclick = function(){
 };
 
 renderVersion();
+/* head 里那段只是先把属性加上防闪;这里再跑一遍,把按钮的选中态和 S.theme 对齐。
+   本机存档里存的主题会在 bootRestore() 里覆盖它。 */
+(function(){
+  var t = 'forge';
+  try { t = localStorage.getItem(THEME_PREF) || 'forge'; } catch(e){}
+  applyTheme(t);
+})();
 syncActive();
 renderRail();
 resetStage();

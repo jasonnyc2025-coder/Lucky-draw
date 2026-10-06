@@ -11,7 +11,8 @@
     "test:storage": "node test/run.js storage",
     "test:assets": "node test/run.js assets",
     "test:audio": "node test/run.js audio",
-    "test:edge": "node test/run.js edge"
+    "test:edge": "node test/run.js edge",
+    "test:theme": "node test/run.js theme"
   },
   "devDependencies": {
     "@fontsource/noto-sans-thai": "^5.3.0",
