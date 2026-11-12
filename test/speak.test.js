@@ -22,7 +22,9 @@ const MOCK = () => {
     speak: (u) => {
       if (!String(u.text).trim()) return;          // 解锁用的静音空格,不算一句
       window.__said.push({ text: u.text, voice: u.voice && u.voice.name, lang: u.lang, rate: u.rate });
-      if (window.__ttsFail) { setTimeout(() => u.onerror && u.onerror({ error: window.__ttsFail }), 10); }
+      if (window.__failVoice && u.voice && window.__failVoice.test(u.voice.name)) {
+        setTimeout(() => u.onerror && u.onerror({ error: 'network' }), 10);
+      } else if (window.__ttsFail) { setTimeout(() => u.onerror && u.onerror({ error: window.__ttsFail }), 10); }
       else { setTimeout(() => u.onstart && u.onstart(), 10); }
     },
     cancel: () => { window.__cancels++; },
@@ -76,13 +78,41 @@ module.exports = async function run({ url }) {
       phraseFor('แพรวา ไวยาประโคน', { th: 'รางวัลที่ 3', zh: '三等奖' }, 'th'));
     const zh = await page.evaluate(() =>
       phraseFor('李明华', { th: 'รางวัลที่ 3', zh: '三等奖' }, 'zh'));
-    R.check('泰文句子是「恭喜 + 名字 + 得了第几等奖」',
-            th === 'ขอแสดงความยินดี คุณ แพรวา ไวยาประโคน ได้รับรางวัลที่ 3', th);
-    R.check('中文句子是「恭喜 + 名字 + 获得几等奖」', zh === '恭喜 李明华 获得三等奖', zh);
+    R.check('泰文句子是「恭喜, 名字, 得了第几等奖」(逗号让语音引擎在名字前后停顿)',
+            th === 'ขอแสดงความยินดี, คุณ แพรวา ไวยาประโคน, ได้รับรางวัลที่ 3', th);
+    R.check('中文句子是「恭喜, 名字, 获得几等奖」', zh === '恭喜, 李明华, 获得三等奖!', zh);
     const titled = await page.evaluate(() =>
       phraseFor('นาย แพรวา ไวยาประโคน', { th: 'รางวัลที่ 3' }, 'th'));
     R.check('名字自带 นาย/นางสาว 时不再多加一个 คุณ(不然念成「先生先生」)',
             titled.indexOf('คุณ') < 0 && titled.indexOf('นาย แพรวา') > 0, titled);
+
+    // ---------- 有自然声音就优先用,联网失败自动退回本地 ----------
+    const nat = await page.evaluate(() => new Promise(res => {
+      const base = speechSynthesis.getVoices();
+      const withNat = base.concat([{ name: 'Microsoft Premwadee Online (Natural) - Thai (Thailand)',
+                                     lang: 'th-TH', localService: false }]);
+      const keep = speechSynthesis.getVoices;
+      speechSynthesis.getVoices = () => withNat;
+      TTS.voices = withNat; TTS.pick = {};
+      const picked = pickVoice('th').name;
+      window.__said = []; window.__failVoice = /Online/;
+      const wasOn = TTS.on; TTS.on = true;
+      speak('ทดสอบ', 'th', () => {});
+      setTimeout(() => {
+        const out = { picked, said: window.__said.map(x => x.voice), last: TTS.last && TTS.last.ok };
+        window.__failVoice = null; TTS.on = wasOn;
+        speechSynthesis.getVoices = keep; TTS.voices = keep();
+        res(out);
+      }, 300);
+    }));
+    R.check('设备上有「Natural」神经网络声音时优先用它(比老式合成自然得多)',
+            /Online \(Natural\)/.test(nat.picked), nat.picked);
+    R.check('自然声音联网失败时,自动换本地女声再念一次(不会一声不吭)',
+            nat.said.length === 2 && /Online/.test(nat.said[0]) &&
+            nat.said[1] === 'Microsoft Premwadee - Thai (Thailand)' && nat.last === true,
+            JSON.stringify(nat.said));
+    R.check('音调用原声(人为提高反而更假)',
+            /u\.pitch = 1;/.test(await page.evaluate(() => speak.toString())));
 
     // ---------- 跟着名字的文字选语言 ----------
     R.check('看名字是泰文还是中文(中文声音念不出泰文名字)',

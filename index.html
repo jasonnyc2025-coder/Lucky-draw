@@ -957,7 +957,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v42';
+var APP_VERSION = 'v43';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2414,6 +2414,7 @@ var TTS = { on:false, lang:'auto', rate:0.8, voices:[], pick:{} };
 
 /* 各平台常见的女声。拿不准时宁可按这个名单挑,也别随便抓一个男声。 */
 var FEMALE_HINTS = /female|premwadee|kanya|narisa|tingting|ting-ting|huihui|xiaoxiao|yaoyao|mei-?jia|sinji|samantha|zira|susan|karen|moira|tessa|fiona|google ไทย|google 普通话|google 國語/i;
+var NATURAL_HINTS = /natural|neural|online|premium|enhanced|wavenet|studio/i;
 var MALE_HINTS   = /male|pattara|liang|yunyang|kangkang|daniel|alex|fred|rishi|google 日本語/i;
 
 /* 语音列表的签名。列表没变就什么都不做 —— 这一行是关键。
@@ -2459,20 +2460,27 @@ function pickVoice(lang){
     var s = 0;
     if (FEMALE_HINTS.test(v.name)) s += 10;      // 用户要女声
     if (MALE_HINTS.test(v.name)) s -= 10;
+    /* 神经网络合成的声音(Edge 的「… Online (Natural)」、Google 的联网语音等)
+       比系统自带的老式合成自然得多,优先用。它们要联网 —— 断网时念不出来,
+       下面 speak() 里会自动退回本地声音再念一次,所以不怕现场断网。 */
+    if (NATURAL_HINTS.test(v.name)) s += 8;
     if (v.localService) s += 3;                  // 本地的,断网也能用
     return s;
   };
   return cand.slice().sort(function(a, b){ return score(b) - score(a); })[0];
 }
+/* 逗号是给语音引擎看的:每个逗号它会停顿换口气。
+   原来一口气从「恭喜」念到「三等奖」,中间不停,机器味最重的就是这一点。
+   名字前后各停一下,听的人也能听清名字。 */
 function phraseFor(name, tier, lang){
   if (lang === 'zh'){
-    return '恭喜 ' + name + ' 获得' + ((tier && tier.zh) || '奖项');
+    return '恭喜, ' + name + ', 获得' + ((tier && tier.zh) || '奖项') + '!';
   }
   /* 泰文:คุณ 是尊称。但名单里的名字常常自带 นาย / นางสาว(称谓那一列),
      再加 คุณ 就成了「คุณ นาย」—— 先生先生,念出来很怪。自带了就不加。 */
   var hasTitle = /^\s*(คุณ|นาย|นาง|นางสาว|ด\.ช\.|ด\.ญ\.|ดร\.|นพ\.|พญ\.)/.test(name);
-  return 'ขอแสดงความยินดี ' + (hasTitle ? '' : 'คุณ ') + name +
-         ' ได้รับ' + ((tier && tier.th) || 'รางวัล');
+  return 'ขอแสดงความยินดี, ' + (hasTitle ? '' : 'คุณ ') + name +
+         ', ได้รับ' + ((tier && tier.th) || 'รางวัล');
 }
 /* 最近一次播报的结果,显示在设置里 —— 现场没出声时进设置一看就知道卡在哪 */
 TTS.last = null;
@@ -2490,14 +2498,14 @@ var TTS_ERR = {
   'audio-busy': '声音通道被占用',
   'audio-hardware': '找不到扬声器 / 音频输出'
 };
-function speak(text, lang, onDone){
+function speak(text, lang, onDone, forceVoice){
   /* 右上角 🔇 静音时语音也不念 —— 大家都默认那个喇叭管的是**所有**声音 */
   if (!TTS.on || !A.on || !('speechSynthesis' in window)) return false;
   /* 每次念之前重新拿一遍声音对象。Android 上 getVoices() 每次返回新对象,
      用缓存里的旧对象赋给 u.voice,有的机型会**静默失败** —— 不报错,就是不出声。 */
   var fresh = [];
   try { fresh = speechSynthesis.getVoices() || []; } catch(e){}
-  var want = pickVoice(lang);
+  var want = forceVoice || pickVoice(lang);
   var v = want ? (fresh.filter(function(x){ return x.name === want.name; })[0] || want) : null;
 
   /* 设备上有语音、但偏偏没有这种语言的:不念。
@@ -2513,12 +2521,22 @@ function speak(text, lang, onDone){
   if (v){ u.voice = v; u.lang = v.lang; }
   else { u.lang = lang === 'zh' ? 'zh-CN' : 'th-TH'; }
   u.rate = TTS.rate;
-  u.pitch = 1.05;                      // 略微提一点,女声更明亮
+  u.pitch = 1;    /* 原来提到 1.05 想让女声更亮,实际听起来更假,回到原声 */
   var started = false;
   u.onstart = function(){ started = true; ttsLast(true); if (onDone) onDone(true); };
   u.onerror = function(e){
     var code = e && e.error;
     if (code === 'interrupted' || code === 'canceled') return;   // 是我们自己掐的,不算
+    /* 自然声音多半要联网。断网或服务出错时,换这台设备上最好的本地声音再念一次 ——
+       宁可念得机器一点,也不能一声不吭 */
+    if (!forceVoice && v && !v.localService){
+      var local = (TTS.voices || []).filter(function(x){
+        return x.localService && (x.lang || '').toLowerCase().replace('_', '-').indexOf(lang) === 0;
+      }).sort(function(a, b){
+        return (FEMALE_HINTS.test(b.name) ? 1 : 0) - (FEMALE_HINTS.test(a.name) ? 1 : 0);
+      })[0];
+      if (local){ started = true; speak(text, lang, onDone, local); return; }
+    }
     ttsLast(false, TTS_ERR[code] || ('出错了:' + (code || '未知')));
     if (onDone) onDone(false);
   };
