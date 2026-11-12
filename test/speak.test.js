@@ -171,6 +171,53 @@ module.exports = async function run({ url }) {
             /一个语音都没装好/.test(note) && /Windows/.test(note), note.slice(0, 60));
     await ctx2.close();
 
+    // ---------- 弹出框背后不能闪(v39 引入的死循环) ----------
+    /* 有些 Android 版 Chrome 在 voiceschanged 里调 getVoices() 会再触发一次
+       voiceschanged。v39 每次都重建声音下拉框 → 每秒几百次 DOM 变化,
+       加上弹出框背后的毛玻璃,整个背景一直闪。这里原样模拟那个行为。 */
+    const ctx3 = await browser.newContext({ viewport: { width: 1000, height: 750 },
+                                            deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await ctx3.addInitScript(() => {
+      const list = [{ name: 'th-th-x-thd-local', lang: 'th-TH', localService: true },
+                    { name: 'cmn-cn-x-ccc-local', lang: 'zh-CN', localService: true }];
+      window.__gv = 0;
+      const ss = { onvoiceschanged: null, speak() {}, cancel() {},
+        getVoices() {
+          window.__gv++;
+          setTimeout(() => { if (ss.onvoiceschanged) ss.onvoiceschanged(); }, 30);
+          return list.map(v => Object.assign({}, v));   // 每次都是新对象,跟真机一样
+        } };
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, writable: true, value: ss });
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, writable: true,
+        value: function (t) { this.text = t; } });
+    });
+    const p3 = await ctx3.newPage();
+    p3.on('pageerror', e => errs.push(e.message));
+    await p3.goto(url, { waitUntil: 'load' });
+    await p3.waitForTimeout(1500);
+    await p3.click('#bNames'); await p3.waitForTimeout(500);
+    const quiet = await p3.evaluate(() => new Promise(res => {
+      let n = 0; const gv0 = window.__gv;
+      const mo = new MutationObserver(l => { n += l.length; });
+      mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+      setTimeout(() => { mo.disconnect(); res({ dom: n, getVoices: window.__gv - gv0 }); }, 3000);
+    }));
+    R.check('打开名单面板后,后面的页面 3 秒内基本不变(原来 800 多次)',
+            quiet.dom <= 3, JSON.stringify(quiet));
+    R.check('语音列表稳定后不再反复读取(死循环断掉了)',
+            quiet.getVoices <= 2, JSON.stringify(quiet));
+    R.check('平板 / 手机等触屏设备上,弹出框背后不用毛玻璃(GPU 吃不消会闪)',
+            await p3.evaluate(() => {
+              const bf = getComputedStyle(document.querySelector('#vNames')).backdropFilter;
+              return !bf || bf === 'none';
+            }),
+            await p3.evaluate(() => getComputedStyle(document.querySelector('#vNames')).backdropFilter));
+    R.check('弹出框的标题栏正常显示',
+            await p3.evaluate(() =>
+              document.querySelector('#vNames .panel-h').getBoundingClientRect().height > 40 &&
+              /参与名单/.test(document.querySelector('#vNames .panel-h').textContent)));
+    await ctx3.close();
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();

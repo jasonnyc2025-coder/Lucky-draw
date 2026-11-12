@@ -438,9 +438,11 @@ input,select{font:inherit;color:inherit}
   position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.9);
   display:none;align-items:center;justify-content:center;padding:20px;
 }
-/* 毛玻璃只在宽屏上开。手机 GPU 做 backdrop-filter 很吃力,后面内容一有变动
-   就得整屏重新模糊一遍,会看到背景一闪一闪;窄屏改用更不透明的纯色遮罩。 */
-@media (min-width:821px){
+/* 毛玻璃只在**用鼠标的电脑**上开。手机、平板的 GPU 做 backdrop-filter 很吃力,
+   后面内容一有变动就得整屏重新模糊一遍,会看到背景一闪一闪。
+   原来只按宽度判断(≥821px),结果平板(1000px 上下)也开着毛玻璃,照样闪。
+   改成看输入方式:hover + 精确指针 = 电脑;触屏设备一律用不透明的纯色遮罩。 */
+@media (min-width:821px) and (hover:hover) and (pointer:fine){
   .veil{background:rgba(16,12,10,.72);backdrop-filter:blur(3px)}
 }
 @supports (height:100svh){ .veil{height:100svh} }
@@ -954,7 +956,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v39';
+var APP_VERSION = 'v40';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2413,9 +2415,25 @@ var TTS = { on:false, lang:'auto', rate:0.95, voices:[], pick:{} };
 var FEMALE_HINTS = /female|premwadee|kanya|narisa|tingting|ting-ting|huihui|xiaoxiao|yaoyao|mei-?jia|sinji|samantha|zira|susan|karen|moira|tessa|fiona|google ไทย|google 普通话|google 國語/i;
 var MALE_HINTS   = /male|pattara|liang|yunyang|kangkang|daniel|alex|fred|rishi|google 日本語/i;
 
+/* 语音列表的签名。列表没变就什么都不做 —— 这一行是关键。
+   有些 Android 版 Chrome 在 voiceschanged 里调 getVoices() 会**再触发一次**
+   voiceschanged;原来每次都重建声音下拉框,于是每秒几百次死循环,
+   加上弹出框背后的毛玻璃,整个背景一直在闪(v39 引入,v40 修)。 */
+/* 初始值必须是 null 而不是 '':设备上一个语音都没有时签名就是 '',
+   要是初始值也是 '',第一次就被当成「没变」跳过,提示文字永远是「…」 */
+var voicesSig = null;
 function loadVoices(){
   if (!('speechSynthesis' in window)) return;
-  TTS.voices = speechSynthesis.getVoices() || [];
+  var v = speechSynthesis.getVoices() || [];
+  var sig = v.map(function(x){ return x.name + '|' + x.lang; }).join(',');
+  if (sig === voicesSig){
+    /* 第二次读到一模一样的列表 = 已经稳定了,不用再听这个事件,
+       顺手把可能存在的循环彻底断掉 */
+    if (v.length) speechSynthesis.onvoiceschanged = null;
+    return;
+  }
+  voicesSig = sig;
+  TTS.voices = v;
   renderVoicePick();
 }
 /* 名字是什么文字,就用哪种语言念 —— 中文声音念不出泰文名字,反过来也一样 */
