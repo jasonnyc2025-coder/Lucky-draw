@@ -18,6 +18,7 @@ const SUITES = {
   update: require('./update.test.js'),
   finale: require('./finale.test.js'),
   bigscreen: require('./bigscreen.test.js'),
+  speak: require('./speak.test.js'),
 };
 
 (async () => {

@@ -835,6 +835,36 @@ td input{padding:9px 10px;font-size:15px}
       </div>
 
       <div class="sec">
+        <div class="sec-h">ประกาศด้วยเสียง · 语音播报</div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="ttsOn"> ประกาศชื่อผู้โชคดี · 念出中奖人的名字</label>
+          <button class="ghost" id="bTtsTest" style="margin-left:auto">ทดสอบ 试听</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <label class="fld" style="min-width:150px"><span>ภาษา · 语言</span>
+            <select id="ttsLang">
+              <option value="auto">自动(跟着名字的文字)</option>
+              <option value="th">ไทย 泰语</option>
+              <option value="zh">中文</option>
+            </select></label>
+          <label class="fld" style="min-width:190px"><span>เสียง · 声音</span>
+            <select id="ttsVoice"></select></label>
+          <label class="fld" style="min-width:150px"><span>ความเร็ว · 语速 <b id="ttsRateVal" style="color:var(--pour)">95%</b></span>
+            <input type="range" id="ttsRate" min="60" max="130" step="5" value="95"
+                   style="accent-color:var(--pour);padding:0;border:none;background:none"></label>
+        </div>
+        <p class="hint" id="ttsNote" style="margin-top:12px">…</p>
+        <p class="hint">开了之后,每揭晓一位就念一句
+        「<b style="color:var(--pour)">ขอแสดงความยินดี คุณ … ได้รับรางวัลที่ 3</b>」
+        或「<b style="color:var(--pour)">恭喜 … 获得三等奖</b>」。默认挑女声。<br>
+        <b>语言建议留「自动」</b>:中文声音念不出泰文名字,反过来也一样。自动模式看名字是泰文还是中文,
+        用对应语言念,发音才对得上。<br>
+        声音是<b>操作系统</b>提供的,不是这个程序带的 —— 哪台机器接投影,就得在哪台机器上先点「试听」确认。
+        名字里带 <b>· 需联网</b> 的声音断网时念不出来,优先选不带这个标记的。<br>
+        这组设置只存在这台设备上,不跟着「保存进度」走。</p>
+      </div>
+
+      <div class="sec">
         <div class="sec-h">จอใหญ่ · 大屏 / 投影</div>
         <div class="row">
           <label class="fld" style="min-width:230px">
@@ -924,7 +954,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v38';
+var APP_VERSION = 'v39';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1357,6 +1387,7 @@ function resetStage(){
   S.frame = null; S.shown = null; S.revealing = false;
   setFocus(false);
   fwStop();                     // 离开总榜就收掉;renderFinalBoard 会自己再点起来
+  ttsStop();
   var t = tierById(S.activeTier);
   var slots = $('#slots');
   slots.innerHTML = '';
@@ -1526,6 +1557,7 @@ function startRoll(){
   var rank = tierRank(t.id);
   S.frame = null; S.shown = null; S.revealing = false;
   fwStop();
+  ttsStop();                    // 上一轮没念完的掐掉,别压着新一轮
   S.rolling = true;
   setFocus(true);
   S.rank = rank;
@@ -1634,6 +1666,9 @@ function stopRoll(){
       c.appendChild(nm);
       if (p.sub){ var s = el('div','sub', p.sub); s.style.fontSize = fitPx(sz.sub); c.appendChild(s); }
       fitCards();            // 多出工号那一行,高度变了,重新量一次
+      /* 念出来。等 260ms 让揭晓的那记木琴先响完,不然两个声音叠在一起谁也听不清。
+         多位中奖时 speechSynthesis 会自己排队,一个念完念下一个。 */
+      setTimeout(function(){ announce(p, t); }, 260);
       setTimeout(function(){ c.classList.remove('molten'); c.classList.add('cast'); }, 900);
     }, HUSH + i * STEP);
   });
@@ -2367,6 +2402,115 @@ function fwStop(){
   }
 }
 
+/* ---------- 语音播报 ---------- */
+/* 用浏览器自带的语音合成(speechSynthesis),不需要任何音频文件,
+   但声音是**操作系统**提供的 —— 哪台机器接投影,就得在哪台机器上试。
+   设置只存在本机(localStorage):能用哪些声音是跟着设备走的。 */
+var TTS_PREF = 'lucky-draw.tts';
+var TTS = { on:false, lang:'auto', rate:0.95, voices:[], pick:{} };
+
+/* 各平台常见的女声。拿不准时宁可按这个名单挑,也别随便抓一个男声。 */
+var FEMALE_HINTS = /female|premwadee|kanya|narisa|tingting|ting-ting|huihui|xiaoxiao|yaoyao|mei-?jia|sinji|samantha|zira|susan|karen|moira|tessa|fiona|google ไทย|google 普通话|google 國語/i;
+var MALE_HINTS   = /male|pattara|liang|yunyang|kangkang|daniel|alex|fred|rishi|google 日本語/i;
+
+function loadVoices(){
+  if (!('speechSynthesis' in window)) return;
+  TTS.voices = speechSynthesis.getVoices() || [];
+  renderVoicePick();
+}
+/* 名字是什么文字,就用哪种语言念 —— 中文声音念不出泰文名字,反过来也一样 */
+function langOfName(name){
+  if (/[฀-๿]/.test(name)) return 'th';
+  if (/[一-鿿]/.test(name)) return 'zh';
+  return null;
+}
+function pickVoice(lang){
+  if (TTS.pick[lang]){
+    var saved = TTS.voices.filter(function(v){ return v.name === TTS.pick[lang]; })[0];
+    if (saved) return saved;
+  }
+  var cand = TTS.voices.filter(function(v){
+    return (v.lang || '').toLowerCase().indexOf(lang) === 0;
+  });
+  if (!cand.length && lang === 'zh'){
+    cand = TTS.voices.filter(function(v){ return /^cmn|^yue|zh/i.test(v.lang || ''); });
+  }
+  if (!cand.length) return null;
+  var score = function(v){
+    var s = 0;
+    if (FEMALE_HINTS.test(v.name)) s += 10;      // 用户要女声
+    if (MALE_HINTS.test(v.name)) s -= 10;
+    if (v.localService) s += 3;                  // 本地的,断网也能用
+    return s;
+  };
+  return cand.slice().sort(function(a, b){ return score(b) - score(a); })[0];
+}
+function phraseFor(name, tier, lang){
+  if (lang === 'zh'){
+    return '恭喜 ' + name + ' 获得' + ((tier && tier.zh) || '奖项');
+  }
+  /* 泰文:คุณ 是尊称。但名单里的名字常常自带 นาย / นางสาว(称谓那一列),
+     再加 คุณ 就成了「คุณ นาย」—— 先生先生,念出来很怪。自带了就不加。 */
+  var hasTitle = /^\s*(คุณ|นาย|นาง|นางสาว|ด\.ช\.|ด\.ญ\.|ดร\.|นพ\.|พญ\.)/.test(name);
+  return 'ขอแสดงความยินดี ' + (hasTitle ? '' : 'คุณ ') + name +
+         ' ได้รับ' + ((tier && tier.th) || 'รางวัล');
+}
+function speak(text, lang){
+  if (!TTS.on || !('speechSynthesis' in window)) return false;
+  var v = pickVoice(lang);
+  var u = new SpeechSynthesisUtterance(text);
+  if (v){ u.voice = v; u.lang = v.lang; }
+  else { u.lang = lang === 'zh' ? 'zh-CN' : 'th-TH'; }
+  u.rate = TTS.rate;
+  u.pitch = 1.05;                      // 略微提一点,女声更明亮
+  try { speechSynthesis.speak(u); } catch(e){ return false; }
+  return true;
+}
+function announce(person, tier){
+  if (!TTS.on) return;
+  var lang = TTS.lang;
+  if (lang === 'auto') lang = langOfName(person.name || '') || 'th';
+  speak(phraseFor(person.name || '', tier, lang), lang);
+}
+function ttsStop(){
+  if ('speechSynthesis' in window){ try { speechSynthesis.cancel(); } catch(e){} }
+}
+function ttsSave(){
+  try { localStorage.setItem(TTS_PREF, JSON.stringify({
+    on:TTS.on, lang:TTS.lang, rate:TTS.rate, pick:TTS.pick })); } catch(e){}
+}
+function renderVoicePick(){
+  var sel = $('#ttsVoice'), note = $('#ttsNote');
+  if (!sel) return;
+  var lang = TTS.lang === 'zh' ? 'zh' : 'th';
+  var cand = TTS.voices.filter(function(v){
+    return (v.lang || '').toLowerCase().indexOf(lang) === 0;
+  });
+  sel.innerHTML = '';
+  sel.appendChild(new Option('อัตโนมัติ 自动挑女声', ''));
+  cand.forEach(function(v){
+    sel.appendChild(new Option(v.name + ' [' + v.lang + ']' +
+      (v.localService ? '' : ' · 需联网'), v.name));
+  });
+  sel.value = TTS.pick[lang] || '';
+
+  if (!note) return;
+  if (!('speechSynthesis' in window)){
+    note.textContent = '这个浏览器不支持语音播报。';
+  } else if (!TTS.voices.length){
+    note.textContent = '⚠ 这台设备上一个语音都没装好。Windows:设置 → 时间和语言 → 语音 → 添加语音;' +
+                       'Mac:系统设置 → 辅助功能 → 朗读内容 → 系统声音。装完刷新这一页。';
+  } else if (!cand.length){
+    note.textContent = '⚠ 这台设备没有' + (lang === 'zh' ? '中文' : '泰语') +
+                       '语音,现在会用默认声音念,发音可能不准。装一个对应语言的语音包会好很多。';
+  } else {
+    var v = pickVoice(lang);
+    note.textContent = '现在用:' + (v ? v.name + ' [' + v.lang + ']' : '默认') +
+                       ' · 这台设备共 ' + TTS.voices.length + ' 个语音,其中' +
+                       (lang === 'zh' ? '中文' : '泰语') + ' ' + cand.length + ' 个。';
+  }
+}
+
 /* ---------- 显示比例(接投影/大电视时调) ---------- */
 /* 只存在这台设备上(localStorage),不跟着「保存进度」走 ——
    它是跟着屏幕走的,换台机器接不同的投影应该重新调。 */
@@ -2758,6 +2902,41 @@ $('#orgMain').oninput = function(){ applyOrg(true); };
 $('#orgSub').oninput  = function(){ applyOrg(true); };
 $('#logoAdd').onclick = function(){ $('#logoFile').click(); };
 
+$('#ttsOn').onchange = function(){
+  TTS.on = this.checked; ttsSave();
+  if (!TTS.on){ ttsStop(); toast('ปิดประกาศเสียง · 语音播报已关闭'); }
+  else {
+    toast('เปิดแล้ว · 语音播报已开启,先点「试听」确认这台设备能出声');
+    renderVoicePick();
+  }
+};
+$('#ttsLang').onchange = function(){ TTS.lang = this.value; ttsSave(); renderVoicePick(); };
+$('#ttsVoice').onchange = function(){
+  var lang = TTS.lang === 'zh' ? 'zh' : 'th';
+  if (this.value) TTS.pick[lang] = this.value; else delete TTS.pick[lang];
+  ttsSave(); renderVoicePick();
+};
+$('#ttsRate').oninput = function(){
+  TTS.rate = +this.value / 100;
+  $('#ttsRateVal').textContent = this.value + '%';
+  ttsSave();
+};
+$('#bTtsTest').onclick = function(){
+  if (!('speechSynthesis' in window)){ toast('เบราว์เซอร์นี้ไม่รองรับ · 这个浏览器不支持语音'); return; }
+  if (!TTS.on){ TTS.on = true; $('#ttsOn').checked = true; ttsSave(); }
+  ttsStop();
+  var lang = TTS.lang === 'zh' ? 'zh' : 'th';
+  /* 有真名单就拿第一个人试,念出来的就是现场会听到的那一句 */
+  var who = (S.pool[0] || S.winners[0] || { name: lang === 'zh' ? '张小明' : 'สมชาย ใจดี' });
+  var tier = tierById(S.activeTier) || S.tiers[0] ||
+             { th:'รางวัลที่ 1', zh:'一等奖' };
+  var l = TTS.lang === 'auto' ? (langOfName(who.name) || 'th') : TTS.lang;
+  var ok = speak(phraseFor(who.name, tier, l), l);
+  toast(ok ? 'กำลังพูด · 正在念:' + phraseFor(who.name, tier, l)
+           : 'ไม่สำเร็จ · 念不出来,看下面那行说明');
+  renderVoicePick();
+};
+
 $('#uiScale').oninput = function(){ applyScale(+this.value / 100, true); };
 $('#bScaleReset').onclick = function(){ applyScale(1, true); toast('กลับเป็น 100% · 已恢复 100%'); };
 
@@ -2871,6 +3050,27 @@ renderVersion();
   var v = 1;
   try { v = parseFloat(localStorage.getItem(UI_PREF)) || 1; } catch(e){}
   applyScale(v);
+})();
+(function(){
+  try {
+    var d = JSON.parse(localStorage.getItem(TTS_PREF) || '{}');
+    TTS.on = !!d.on;
+    TTS.lang = ['auto','th','zh'].indexOf(d.lang) >= 0 ? d.lang : 'auto';
+    TTS.rate = (typeof d.rate === 'number' && d.rate >= 0.5 && d.rate <= 1.5) ? d.rate : 0.95;
+    TTS.pick = (d.pick && typeof d.pick === 'object') ? d.pick : {};
+  } catch(e){}
+  $('#ttsOn').checked = TTS.on;
+  $('#ttsLang').value = TTS.lang;
+  $('#ttsRate').value = Math.round(TTS.rate * 100);
+  $('#ttsRateVal').textContent = Math.round(TTS.rate * 100) + '%';
+  /* 语音列表是异步加载的,第一次拿到的常常是空的 */
+  if ('speechSynthesis' in window){
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 800);
+  } else {
+    renderVoicePick();
+  }
 })();
 applyOrg();          // 把输入框和舞台那块对齐(没存档时就是空的)
 syncActive();

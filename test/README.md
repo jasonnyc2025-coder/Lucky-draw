@@ -24,11 +24,12 @@ npm run test:theme      # 配色和 Logo
 npm run test:update     # 自动更新
 npm run test:finale     # 结束画面和烟花
 npm run test:bigscreen  # 大屏 / 投影
+npm run test:speak      # 语音播报
 ```
 
 全部通过时退出码 0,有失败是 1,可以直接接 CI。
 
-## 十一个套件
+## 十二个套件
 
 | 文件 | 覆盖 |
 |---|---|
@@ -41,6 +42,7 @@ npm run test:bigscreen  # 大屏 / 投影
 | `edge.test.js` | 名额比人多、只剩一个人、猛点按钮、连按空格、导入时的重复行 |
 | `theme.test.js` | 三套配色的对比度(每一组都要 ≥ 7:1)、切换后状态栏颜色、Logo 一键换、大图自动缩、关掉页面重开还在 |
 | `update.test.js` | **真的在临时目录里改 sw.js 造一个新版本**,看打开后会不会自动换过去;以及抽奖中、面板开着时绝不自动刷新 |
+| `speak.test.js` | 语音播报:注入假的 `speechSynthesis`,验自动挑女声、句子内容、跟着名字换语言、开下一轮会掐断、关掉不念、设置记得住 |
 | `bigscreen.test.js` | 1366 / 1080p / 4K / 手机四种屏幕下的实际字号和卡片宽度、显示比例滑杆、**放大后名字卡不会被挤出舞台** |
 | `finale.test.js` | 「工号\|称谓\|名\|姓」这种多列名单能不能拼出完整姓名、总榜上大字是人名不是工号、烟花会放会停、名字压在烟花上面、开关记得住 |
 

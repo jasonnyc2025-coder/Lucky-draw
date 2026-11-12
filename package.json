@@ -15,7 +15,8 @@
     "test:theme": "node test/run.js theme",
     "test:update": "node test/run.js update",
     "test:finale": "node test/run.js finale",
-    "test:bigscreen": "node test/run.js bigscreen"
+    "test:bigscreen": "node test/run.js bigscreen",
+    "test:speak": "node test/run.js speak"
   },
   "devDependencies": {
     "@fontsource/noto-sans-thai": "^5.3.0",
