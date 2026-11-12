@@ -179,10 +179,47 @@ function reporter(suite) {
   };
 }
 
-function chromium() {
-  // playwright 可能装在仓库里,也可能是全局的
+/* 容器里预装的浏览器版本不一定和这里钉死的 playwright 对得上
+   (镜像更新过,playwright 要 chromium_headless_shell-1194,盒子里是 -1243)。
+   对不上就退回用 /opt/pw-browsers/chromium 那个可执行文件,
+   省得每次都要重新下一整个浏览器。 */
+function pwChromium() {
   try { return require(require.resolve('playwright', { paths: [ROOT] })).chromium; } catch (e) {}
   return require('playwright').chromium;
+}
+function fallbackExe() {
+  /* 目录名各版本不一样:chrome-linux / chrome-linux64 /
+     chrome-headless-shell-linux64,全试一遍。完整浏览器排在 headless shell 前面。 */
+  const base = '/opt/pw-browsers';
+  const layouts = [
+    ['chrome-linux64', 'chrome'],
+    ['chrome-linux', 'chrome'],
+    ['chrome-headless-shell-linux64', 'chrome-headless-shell'],
+    ['chrome-headless-shell-linux', 'chrome-headless-shell'],
+  ];
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(base).filter((d) => /^chromium/.test(d));
+  } catch (e) { return null; }
+  dirs.sort((a, b) => (/headless/.test(a) ? 1 : 0) - (/headless/.test(b) ? 1 : 0));
+  for (const d of dirs) {
+    for (const [sub, bin] of layouts) {
+      const c = path.join(base, d, sub, bin);
+      try { if (fs.statSync(c).isFile()) return c; } catch (e) {}
+    }
+  }
+  return null;
+}
+function chromium() {
+  const cr = pwChromium();
+  let ok = true;
+  try { ok = fs.existsSync(cr.executablePath()); } catch (e) { ok = false; }
+  if (ok) return cr;
+  const exe = fallbackExe();
+  if (!exe) return cr;                 // 找不到就照原样跑,让 playwright 自己报错
+  return {
+    launch: (opts) => cr.launch(Object.assign({ executablePath: exe }, opts || {})),
+  };
 }
 
 module.exports = { ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,

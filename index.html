@@ -59,6 +59,9 @@
   --cast-edge:#EFF3F6;   /* 中奖卡描边 */
   --ink:#171310;         /* 中奖卡上的字 */
   --glow:255,138,31;     /* 辉光/点按反馈的 RGB,要和 --pour 同色系 */
+  /* 显示比例。接投影/大电视时在设置里调大 —— 下面所有字号的上限都乘它,
+     下限不乘,所以手机上调了也不会把界面撑爆。 */
+  --sc:1;
 
   --f-display:'Kanit',system-ui,sans-serif;
   --f-util:'Chakra Petch','Kanit',system-ui,sans-serif;
@@ -188,7 +191,9 @@ input,select{font:inherit;color:inherit}
 .app.focus .logo-add{display:none}
 
 /* ---------- body grid ---------- */
-.main{flex:1;display:grid;grid-template-columns:264px 1fr;min-height:0}
+.main{flex:1;display:grid;min-height:0;
+  /* 大屏上这一列也要跟着放大,不然 4K 上只有窄窄一条 */
+  grid-template-columns:clamp(264px,calc(15vw * var(--sc)),620px) 1fr}
 
 /* tier rail */
 .rail{border-right:1px solid var(--line);overflow-y:auto;padding:10px}
@@ -202,11 +207,14 @@ input,select{font:inherit;color:inherit}
 .tier.on{background:var(--shell);border-left-color:var(--pour)}
 .tier.done{opacity:.72}
 .tier.locked{opacity:.6;cursor:not-allowed}
-.tier-th{font-size:19px;font-weight:500;line-height:1.3;display:flex;align-items:center;gap:8px}
+.tier-th{font-size:clamp(19px,calc(1.15vw * var(--sc)),calc(32px * var(--sc)));
+  font-weight:500;line-height:1.3;display:flex;align-items:center;gap:8px}
 .mark{font-style:normal;font-size:14px;color:var(--pour);opacity:1}
-.tier-zh{font-size:15px;color:var(--ash);margin-top:2px}
+.tier-zh{font-size:clamp(15px,calc(.9vw * var(--sc)),calc(24px * var(--sc)));
+  color:var(--ash);margin-top:2px}
 .tier-n{
-  font-family:var(--f-util);font-size:13px;letter-spacing:.08em;color:var(--ash);margin-top:8px;
+  font-family:var(--f-util);font-size:clamp(13px,calc(.78vw * var(--sc)),calc(20px * var(--sc)));
+  letter-spacing:.08em;color:var(--ash);margin-top:8px;
   display:flex;align-items:center;gap:7px;
 }
 .tier.on .tier-n b{color:var(--pour)}
@@ -260,12 +268,14 @@ input,select{font:inherit;color:inherit}
 /* 主行:当前抽的是哪个奖,投影上要看得清 */
 .eb-main{
   font-family:var(--f-display);font-weight:600;
-  font-size:clamp(21px,3.4vw,36px);line-height:1.25;letter-spacing:.03em;color:var(--bone);
+  font-size:clamp(21px,calc(3.4vw * var(--sc)),calc(64px * var(--sc)));
+  line-height:1.25;letter-spacing:.03em;color:var(--bone);
 }
 /* 副行:第几档、抽了几个 */
 .eb-sub{
   font-family:var(--f-util);font-weight:600;
-  font-size:clamp(13px,1.5vw,18px);letter-spacing:.16em;color:var(--ash);margin-top:7px;
+  font-size:clamp(13px,calc(1.5vw * var(--sc)),calc(30px * var(--sc)));
+  letter-spacing:.16em;color:var(--ash);margin-top:7px;
 }
 .eyebrow b{color:var(--pour);font-weight:700}
 
@@ -283,7 +293,8 @@ input,select{font:inherit;color:inherit}
 .stage-head.on{display:flex}
 .app.focus .stage-head{display:none}
 .sh-logo{
-  height:clamp(44px,7vh,96px);width:auto;max-width:min(42vw,340px);
+  height:clamp(44px,calc(7vh * var(--sc)),calc(150px * var(--sc)));
+  width:auto;max-width:min(42vw,560px);
   object-fit:contain;display:none;cursor:pointer;
 }
 .sh-logo.on{display:block}
@@ -297,14 +308,18 @@ input,select{font:inherit;color:inherit}
 }
 .sh-org b{
   font-family:var(--f-display);font-weight:600;color:var(--bone);
-  font-size:clamp(17px,2.3vw,34px);letter-spacing:.01em;overflow-wrap:anywhere;
+  font-size:clamp(17px,calc(2.3vw * var(--sc)),calc(58px * var(--sc)));
+  letter-spacing:.01em;overflow-wrap:anywhere;
 }
 .sh-org span{
   font-family:var(--f-cn);color:var(--ash);
-  font-size:clamp(13px,1.3vw,20px);letter-spacing:.06em;margin-top:2px;overflow-wrap:anywhere;
+  font-size:clamp(13px,calc(1.3vw * var(--sc)),calc(34px * var(--sc)));
+  letter-spacing:.06em;margin-top:2px;overflow-wrap:anywhere;
 }
 .slots{
-  display:grid;gap:12px;width:100%;max-width:1180px;margin-bottom:auto;
+  /* 原来写死 1180px,4K 电视上名字卡只占屏幕 31%,两边全是黑的。
+     现在跟着屏幕走,大屏上铺得开,小屏上还是 100%。 */
+  display:grid;gap:clamp(12px,1vw,28px);width:100%;max-width:min(3000px,94vw);margin-bottom:auto;
   align-content:center;justify-items:center;position:relative;z-index:2;will-change:transform;
 }
 
@@ -820,6 +835,23 @@ td input{padding:9px 10px;font-size:15px}
       </div>
 
       <div class="sec">
+        <div class="sec-h">จอใหญ่ · 大屏 / 投影</div>
+        <div class="row">
+          <label class="fld" style="min-width:230px">
+            <span>ขนาดการแสดงผล · 显示比例 <b id="uiScaleVal" style="color:var(--pour)">100%</b></span>
+            <input type="range" id="uiScale" min="80" max="200" step="5" value="100"
+                   style="accent-color:var(--pour);padding:0;border:none;background:none">
+          </label>
+          <button class="ghost" id="bScaleReset">รีเซ็ต 恢复 100%</button>
+        </div>
+        <p class="hint"><b style="color:var(--pour)">接投影或大电视时先按 F 全屏,再调这里</b>。
+        名字、奖项列表、公司抬头会整体放大;一边调一边看大屏,觉得撑满了就停。<br>
+        1080p 投影一般 120–140%,4K 电视 160–200%。手机和笔记本屏幕保持 100% 就行 ——
+        字号的下限不跟着放大,所以小屏上调了也不会把界面撑爆。<br>
+        这个比例<b>只存在这台设备上</b>,不跟着「保存进度」走 —— 换台机器接别的投影应该重新调。</p>
+      </div>
+
+      <div class="sec">
         <div class="sec-h">ธีมสี · 配色主题</div>
         <div class="themes" id="themes">
           <button class="theme" data-t="forge">
@@ -892,7 +924,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v37';
+var APP_VERSION = 'v38';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1244,18 +1276,70 @@ function slotCount(){
 }
 /* 工号那一行原来是固定的 10-18px,名字最大能到 104px —— 差了五六倍,
    投影上根本看不清。现在副信息跟着名字一起缩放,大约是名字的三分之一。 */
+/* 上限全部乘 --sc(设置里的显示比例),而且比原来高一大截 ——
+   原来姓名封顶 104px,1080p 投影和 4K 电视上一样大,大屏完全没用上。
+   下限不乘,手机上还是原来的样子。 */
+function clampPx(min, vw, max){
+  return 'clamp(' + min + 'px, calc(' + vw + 'vw * var(--sc)), calc(' + max + 'px * var(--sc)))';
+}
+/* 字号上限放开之后,长名字(泰文全名经常很长)会把卡片撑出屏幕。
+   每张卡的字号都乘一个 --fit,量出来放不下就把 --fit 调小,直到装得下。
+   --fit 挂在 #slots 上,所有卡一起缩,大小保持一致。 */
+function fitPx(expr){ return 'calc((' + expr + ') * var(--fit, 1))'; }
+
+function stageAvail(){
+  var cru = $('#crucible'), eb = $('#eyebrow'), hd = $('#stageHead');
+  if (!cru) return 0;
+  var headH = (hd && hd.classList.contains('on'))
+    ? hd.offsetHeight + parseFloat(getComputedStyle(hd).marginBottom || 0) : 0;
+  return cru.clientHeight - (eb ? eb.offsetHeight : 0) - headH - 40;
+}
+function fitCards(){
+  var slots = $('#slots');
+  if (!slots || !slots.children.length) return;
+  var avail = stageAvail();
+  if (avail <= 80) return;
+  var k = 1;
+  slots.style.setProperty('--fit', 1);
+  void slots.offsetHeight;
+  for (var i = 0; i < 12 && slots.getBoundingClientRect().height > avail; i++){
+    k *= 0.88;
+    slots.style.setProperty('--fit', k.toFixed(3));
+    void slots.offsetHeight;                   // 强制回流,别读到上一档的旧高度
+  }
+}
+/* 滚动过程中名字一直在换,长短不一,每帧量一次会忽大忽小。
+   所以开抽前先拿池子里最长的名字量一遍,整轮用同一个字号。 */
+function fitRoundByLongest(cards, sz){
+  if (!cards.length) return;
+  var longest = '';
+  for (var i = 0; i < S.pool.length; i++){
+    var nm = S.pool[i].name || '';
+    if (nm.length > longest.length) longest = nm;
+  }
+  if (!longest) return;
+  var keep = [];
+  for (var c = 0; c < cards.length; c++){ keep.push(cards[c].textContent); cards[c].textContent = longest; }
+  fitCards();
+  for (var d = 0; d < cards.length; d++) cards[d].textContent = keep[d];
+}
+
 function sizeFor(n){
-  if (n <= 1) return {nm:'clamp(40px,8.5vw,104px)', sub:'clamp(20px,2.6vw,34px)', cols:1};
-  if (n <= 2) return {nm:'clamp(30px,5.5vw,66px)', sub:'clamp(17px,1.9vw,26px)', cols:2};
-  if (n <= 4) return {nm:'clamp(24px,3.6vw,46px)', sub:'clamp(15px,1.4vw,21px)', cols:2};
-  if (n <= 6) return {nm:'clamp(20px,2.8vw,36px)', sub:'clamp(14px,1.2vw,18px)', cols:3};
-  if (n <= 12) return {nm:'clamp(16px,2.1vw,28px)', sub:'clamp(13px,1vw,16px)', cols:4};
-  return {nm:'clamp(14px,1.7vw,22px)', sub:'clamp(12px,.85vw,14px)', cols:5};
+  if (n <= 1) return {nm:clampPx(40, 8.5, 190), sub:clampPx(20, 2.6, 62), cols:1};
+  if (n <= 2) return {nm:clampPx(30, 5.5, 120), sub:clampPx(17, 1.9, 44), cols:2};
+  if (n <= 4) return {nm:clampPx(24, 3.6, 84),  sub:clampPx(15, 1.4, 34), cols:2};
+  if (n <= 6) return {nm:clampPx(20, 2.8, 64),  sub:clampPx(14, 1.2, 28), cols:3};
+  if (n <= 12) return {nm:clampPx(16, 2.1, 48), sub:clampPx(13, 1,   24), cols:4};
+  return {nm:clampPx(14, 1.7, 38), sub:clampPx(12, .85, 20), cols:5};
 }
 /* 只留中间舞台的专注模式 */
 function setFocus(on){
   var app = document.querySelector('.app');
-  if (app) app.classList.toggle('focus', !!on);
+  if (!app) return;
+  var was = app.classList.contains('focus');
+  app.classList.toggle('focus', !!on);
+  /* 专注模式进出会收起/展开顶栏和奖项列表,舞台高度跟着变,卡片要重新量 */
+  if (was !== !!on && typeof fitCards === 'function') fitCards();
 }
 
 function esc(t){
@@ -1309,10 +1393,11 @@ function resetStage(){
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
   for (var i = 0; i < n; i++){
     var card = el('div','ingot empty');
-    var nm = el('div','nm','?'); nm.style.fontSize = sz.nm;
+    var nm = el('div','nm','?'); nm.style.fontSize = fitPx(sz.nm);
     card.appendChild(nm);
     slots.appendChild(card);
   }
+  fitCards();
   updateControls();
 }
 /* 屏幕尺寸变了(手机地址栏收起、转屏)时,把已揭晓的名字按新尺寸重画一遍。
@@ -1332,12 +1417,13 @@ function renderShown(){
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
   S.shown.forEach(function(p){
     var c = el('div','ingot cast still');
-    var nm = el('div','nm', p.name); nm.style.fontSize = sz.nm;
+    var nm = el('div','nm', p.name); nm.style.fontSize = fitPx(sz.nm);
     c.appendChild(nm);
-    if (p.sub){ var sb = el('div','sub', p.sub); sb.style.fontSize = sz.sub; c.appendChild(sb); }
+    if (p.sub){ var sb = el('div','sub', p.sub); sb.style.fontSize = fitPx(sz.sub); c.appendChild(sb); }
     slots.appendChild(c);
   });
   $('#eyebrow').innerHTML = keep;
+  fitCards();
   updateControls();
   return true;
 }
@@ -1346,6 +1432,15 @@ function allDone(){
   return S.tiers.length > 0 && S.winners.length > 0 && currentIndex() < 0;
 }
 /* 一屏放不下就把字号往下降一档,降到最小还放不下才允许滚动 */
+/* 总榜的字号阶梯。原来写死从 40px 起,1080p 投影和 4K 电视上一样大 ——
+   大屏白白空着。现在起点跟着舞台宽度和显示比例走。 */
+function boardLadder(cruW){
+  var top = Math.min(130, Math.max(40, cruW / 22)) * uiScale();
+  var out = [], v = top;
+  while (v > 12){ out.push(Math.round(v)); v *= 0.85; }
+  out.push(11);
+  return out;
+}
 function fitBoard(board){
   function run(){
     var cru = $('#crucible'), eb = $('#eyebrow'), hd = $('#stageHead');
@@ -1354,7 +1449,7 @@ function fitBoard(board){
                 parseFloat(getComputedStyle(hd).marginBottom || 0) : 0;
     var avail = cru.clientHeight - eb.offsetHeight - headH - 56;
     board.style.maxHeight = Math.max(160, avail) + 'px';
-    var sizes = [40, 34, 29, 25, 21, 18, 15, 13, 11];
+    var sizes = boardLadder(cru.clientWidth);
     for (var i = 0; i < sizes.length; i++){
       board.style.setProperty('--bfs', sizes[i] + 'px');
       void board.offsetHeight;                  // 强制回流,别读到上一档的旧高度
@@ -1447,11 +1542,13 @@ function startRoll(){
   slots.style.gridTemplateColumns = 'repeat(' + Math.min(sz.cols, n) + ',minmax(0,1fr))';
   for (var i = 0; i < n; i++){
     var card = el('div','ingot roll');
-    var nm = el('div','nm','—'); nm.style.fontSize = sz.nm;
+    var nm = el('div','nm','—'); nm.style.fontSize = fitPx(sz.nm);
     card.appendChild(nm);
     slots.appendChild(card);
   }
   var cards = slots.querySelectorAll('.nm');
+  /* 整轮用同一个字号:按池子里最长的名字量一次,滚动时不会忽大忽小 */
+  fitRoundByLongest(cards, sz);
   S.frame = pickDistinct(S.pool, n);
   for (var k = 0; k < cards.length; k++) cards[k].textContent = S.frame[k].name;
 
@@ -1533,9 +1630,10 @@ function stopRoll(){
       soundReveal(i, i === picked.length - 1);
       c.className = 'ingot molten';
       c.innerHTML = '';
-      var nm = el('div','nm', p.name); nm.style.fontSize = sz.nm;
+      var nm = el('div','nm', p.name); nm.style.fontSize = fitPx(sz.nm);
       c.appendChild(nm);
-      if (p.sub){ var s = el('div','sub', p.sub); s.style.fontSize = sz.sub; c.appendChild(s); }
+      if (p.sub){ var s = el('div','sub', p.sub); s.style.fontSize = fitPx(sz.sub); c.appendChild(s); }
+      fitCards();            // 多出工号那一行,高度变了,重新量一次
       setTimeout(function(){ c.classList.remove('molten'); c.classList.add('cast'); }, 900);
     }, HUSH + i * STEP);
   });
@@ -1562,6 +1660,9 @@ function stopRoll(){
       }
     }
     eyebrow(main, sub);
+    /* 标题这时才换成「恭喜 …」,比刚才那行高 —— 舞台能用的高度跟着变小了,
+       必须在这之后再量一次,否则大屏/高比例下卡片会被挤出屏幕。 */
+    fitCards();
     S.revealing = false;
     setFocus(false);
     renderRail();
@@ -2266,6 +2367,30 @@ function fwStop(){
   }
 }
 
+/* ---------- 显示比例(接投影/大电视时调) ---------- */
+/* 只存在这台设备上(localStorage),不跟着「保存进度」走 ——
+   它是跟着屏幕走的,换台机器接不同的投影应该重新调。 */
+var UI_PREF = 'lucky-draw.uiScale';
+function uiScale(){
+  var v = parseFloat(document.documentElement.style.getPropertyValue('--sc'));
+  return (v && v > 0) ? v : 1;
+}
+function applyScale(v, save){
+  v = Math.min(2, Math.max(0.8, +v || 1));
+  document.documentElement.style.setProperty('--sc', v);
+  var lab = $('#uiScaleVal');
+  if (lab) lab.textContent = Math.round(v * 100) + '%';
+  var sl = $('#uiScale');
+  if (sl && +sl.value !== Math.round(v * 100)) sl.value = Math.round(v * 100);
+  if (save){ try { localStorage.setItem(UI_PREF, String(v)); } catch(e){} }
+  /* 字号变了,总榜要按新尺寸重新挑一档 */
+  var b = document.querySelector('.board');
+  if (b) fitBoard(b);
+  /* 揭晓中的那一屏也重画一下,卡片的内联字号才会跟着变 */
+  if (!S.rolling && !S.revealing && S.shown) renderShown();
+  else fitCards();
+}
+
 /* ---------- 配色主题 ---------- */
 var THEME_PREF = 'lucky-draw.theme';
 var THEMES = {
@@ -2633,6 +2758,9 @@ $('#orgMain').oninput = function(){ applyOrg(true); };
 $('#orgSub').oninput  = function(){ applyOrg(true); };
 $('#logoAdd').onclick = function(){ $('#logoFile').click(); };
 
+$('#uiScale').oninput = function(){ applyScale(+this.value / 100, true); };
+$('#bScaleReset').onclick = function(){ applyScale(1, true); toast('กลับเป็น 100% · 已恢复 100%'); };
+
 $('#fwOn').checked = FW.on;
 $('#fwOn').onchange = function(){
   FW.on = this.checked;
@@ -2738,6 +2866,11 @@ renderVersion();
   var t = 'forge';
   try { t = localStorage.getItem(THEME_PREF) || 'forge'; } catch(e){}
   applyTheme(t);
+})();
+(function(){
+  var v = 1;
+  try { v = parseFloat(localStorage.getItem(UI_PREF)) || 1; } catch(e){}
+  applyScale(v);
 })();
 applyOrg();          // 把输入框和舞台那块对齐(没存档时就是空的)
 syncActive();

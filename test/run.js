@@ -17,6 +17,7 @@ const SUITES = {
   theme: require('./theme.test.js'),
   update: require('./update.test.js'),
   finale: require('./finale.test.js'),
+  bigscreen: require('./bigscreen.test.js'),
 };
 
 (async () => {
