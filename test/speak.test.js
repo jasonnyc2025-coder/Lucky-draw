@@ -19,9 +19,14 @@ const MOCK = () => {
   window.__cancels = 0;
   Object.defineProperty(window, 'speechSynthesis', { configurable: true, writable: true, value: {
     getVoices: () => list,
-    speak: (u) => window.__said.push({ text: u.text, voice: u.voice && u.voice.name,
-                                       lang: u.lang, rate: u.rate }),
+    speak: (u) => {
+      if (!String(u.text).trim()) return;          // 解锁用的静音空格,不算一句
+      window.__said.push({ text: u.text, voice: u.voice && u.voice.name, lang: u.lang, rate: u.rate });
+      if (window.__ttsFail) { setTimeout(() => u.onerror && u.onerror({ error: window.__ttsFail }), 10); }
+      else { setTimeout(() => u.onstart && u.onstart(), 10); }
+    },
     cancel: () => { window.__cancels++; },
+    resume: () => {},
     onvoiceschanged: null,
   }});
   Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, writable: true,
@@ -54,6 +59,9 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(900);
 
     R.check('读到设备上的语音列表', await page.evaluate(() => TTS.voices.length) === 6);
+    /* 原来默认关着,得进设置去找 —— 用户以为功能坏了 */
+    R.check('语音播报默认是打开的(不用进设置去找)',
+            await page.evaluate(() => TTS.on === true && document.querySelector('#ttsOn').checked));
 
     // ---------- 挑女声 ----------
     R.check('泰语挑的是女声 Premwadee,不是男声 Pattara',
@@ -93,6 +101,8 @@ module.exports = async function run({ url }) {
     await page.evaluate(() => {
       S.tiers = [{ id: 't1', th: 'รางวัลที่ 3', zh: '三等奖', quota: 9, per: 3 }];
       S.winners = []; S.history = [];
+      /* 留一份名单副本:后面几节要从满池子重新开始抽 */
+      window.__poolCopy = S.pool.map(x => Object.assign({}, x));
       syncActive(); renderRail(); resetStage(); updateControls();
       window.__said = [];
     });
@@ -111,7 +121,7 @@ module.exports = async function run({ url }) {
             JSON.stringify(said.map(x => x.voice)));
     R.check('每句都带上了是第几等奖',
             said.every(x => /รางวัลที่ 3|三等奖/.test(x.text)));
-    R.check('语速用的是设置里的值', said.every(x => x.rate === 0.95), said[0] && said[0].rate);
+    R.check('语速用的是设置里的值', said.every(x => x.rate === 0.8), said[0] && said[0].rate);
 
     // ---------- 掐断 ----------
     await page.evaluate(() => { window.__cancels = 0; });
@@ -135,6 +145,57 @@ module.exports = async function run({ url }) {
             await page.evaluate(() => window.__said.length) === 0,
             JSON.stringify(await page.evaluate(() => window.__said)));
 
+    // ---------- 右上角 🔇 静音时语音也不念 ----------
+    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await page.check('#ttsOn'); await page.waitForTimeout(150);
+    await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
+    await page.click('#bSound'); await page.waitForTimeout(150);          // 静音
+    await page.evaluate(() => {
+      S.pool = window.__poolCopy.map(x => Object.assign({}, x));
+      S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
+      updateControls(); window.__said = [];
+    });
+    await page.click('#bPour'); await page.waitForTimeout(1000);
+    await page.click('#bPour'); await page.waitForTimeout(5500);
+    R.check('右上角喇叭静音时,语音也一起静音',
+            await page.evaluate(() => window.__said.length) === 0,
+            JSON.stringify(await page.evaluate(() => window.__said)));
+    await page.click('#bSound'); await page.waitForTimeout(150);          // 打开回来
+
+    // ---------- 没出声时要能说出原因 ----------
+    await page.evaluate(() => { window.__ttsFail = 'language-unavailable'; });
+    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await page.click('#bTtsTest'); await page.waitForTimeout(800);
+    const diag = await page.evaluate(() => ({
+      toast: document.querySelector('#toast').textContent,
+      note: document.querySelector('#ttsNote').textContent,
+    }));
+    R.check('试听没出声时,提示条直接说原因(不是默默没声音)',
+            /没出声/.test(diag.toast) && /没有这种语言的语音/.test(diag.toast), diag.toast);
+    R.check('设置里那行说明记着「上次播报没出声」和原因',
+            /上次播报.*没出声.*没有这种语言的语音/.test(diag.note), diag.note.slice(-60));
+    await page.evaluate(() => { window.__ttsFail = null; });
+    await page.click('#bTtsTest'); await page.waitForTimeout(800);
+    R.check('正常出声后,说明那行变成「出声了」',
+            /上次播报.*✓ 出声了/.test(await page.evaluate(() =>
+              document.querySelector('#ttsNote').textContent)));
+    await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
+
+    // ---------- 设备上有语音但没有泰语:不拿英文声音去念泰文 ----------
+    const noThai = await page.evaluate(() => {
+      const keep = speechSynthesis.getVoices;
+      const only = [{ name: 'Microsoft David - English (United States)', lang: 'en-US', localService: true }];
+      speechSynthesis.getVoices = () => only;
+      TTS.voices = only; TTS.pick = {}; window.__said = [];
+      const ok = speak('ขอแสดงความยินดี นาย ทดสอบ ได้รับรางวัลที่ 3', 'th');
+      speechSynthesis.getVoices = keep;
+      TTS.voices = keep();
+      return { ok, said: window.__said.length, why: TTS.last && TTS.last.why };
+    });
+    R.check('设备上没有泰语语音时不硬念(英文声音念泰文只会出怪声)',
+            noThai.ok === false && noThai.said === 0 && /没有泰语语音/.test(noThai.why),
+            JSON.stringify(noThai));
+
     // ---------- 设置记在本机 ----------
     await page.click('#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn');
@@ -154,6 +215,38 @@ module.exports = async function run({ url }) {
             kept.box && kept.sel === 'zh', JSON.stringify(kept));
 
     // ---------- 设备上没有对应语言的语音时要说清楚 ----------
+    /* 用户明确关掉的,重开后要保持关闭 —— 「默认打开」不能把用户的选择盖掉 */
+    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await page.uncheck('#ttsOn'); await page.waitForTimeout(200);
+    await page.reload({ waitUntil: 'load' }); await page.waitForTimeout(1200);
+    R.check('用户明确关掉的,重开后保持关闭(「默认打开」不会把它盖掉)',
+            await page.evaluate(() => TTS.on === false && !document.querySelector('#ttsOn').checked));
+
+    /* 语速默认从 0.95 降到 0.8(现场反馈念得太快)。
+       已经存着旧默认值的设备要自动换过来;用户自己拉过滑杆的不能动。 */
+    const rateAfter = async (stored) => {
+      const c = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+      await c.addInitScript((v) => {
+        if (!sessionStorage.getItem('seeded')) {
+          localStorage.setItem('lucky-draw.tts', v);
+          sessionStorage.setItem('seeded', '1');
+        }
+      }, JSON.stringify(stored));
+      const pg = await c.newPage();
+      await pg.goto(url, { waitUntil: 'load' }); await pg.waitForTimeout(900);
+      const r = await pg.evaluate(() => ({ rate: TTS.rate,
+        slider: document.querySelector('#ttsRate').value }));
+      await c.close();
+      return r;
+    };
+    const oldDefault = await rateAfter({ on: true, lang: 'auto', rate: 0.95, pick: {} });
+    R.check('旧版存的默认语速 95% 自动换成新默认 80%',
+            oldDefault.rate === 0.8 && oldDefault.slider === '80', JSON.stringify(oldDefault));
+    const userPicked = await rateAfter({ v: 2, on: true, lang: 'auto', rate: 0.95, pick: {} });
+    R.check('用户自己选的语速不会被改掉', userPicked.rate === 0.95, JSON.stringify(userPicked));
+    const fresh = await rateAfter({});
+    R.check('新设备默认语速是 80%', fresh.rate === 0.8, JSON.stringify(fresh));
+
     const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 800 } });
     await ctx2.addInitScript(() => {
       Object.defineProperty(window, 'speechSynthesis', { configurable: true, writable: true, value: {

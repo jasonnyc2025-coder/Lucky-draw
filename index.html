@@ -851,12 +851,13 @@ td input{padding:9px 10px;font-size:15px}
             </select></label>
           <label class="fld" style="min-width:190px"><span>เสียง · 声音</span>
             <select id="ttsVoice"></select></label>
-          <label class="fld" style="min-width:150px"><span>ความเร็ว · 语速 <b id="ttsRateVal" style="color:var(--pour)">95%</b></span>
-            <input type="range" id="ttsRate" min="60" max="130" step="5" value="95"
+          <label class="fld" style="min-width:150px"><span>ความเร็ว · 语速 <b id="ttsRateVal" style="color:var(--pour)">80%</b></span>
+            <input type="range" id="ttsRate" min="50" max="130" step="5" value="80"
                    style="accent-color:var(--pour);padding:0;border:none;background:none"></label>
         </div>
         <p class="hint" id="ttsNote" style="margin-top:12px">…</p>
-        <p class="hint">开了之后,每揭晓一位就念一句
+        <p class="hint"><b style="color:var(--pour)">默认是打开的</b>。右上角喇叭 🔇 静音时语音也一起静音。<br>
+        每揭晓一位就念一句
         「<b style="color:var(--pour)">ขอแสดงความยินดี คุณ … ได้รับรางวัลที่ 3</b>」
         或「<b style="color:var(--pour)">恭喜 … 获得三等奖</b>」。默认挑女声。<br>
         <b>语言建议留「自动」</b>:中文声音念不出泰文名字,反过来也一样。自动模式看名字是泰文还是中文,
@@ -956,7 +957,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v40';
+var APP_VERSION = 'v42';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2409,7 +2410,7 @@ function fwStop(){
    但声音是**操作系统**提供的 —— 哪台机器接投影,就得在哪台机器上试。
    设置只存在本机(localStorage):能用哪些声音是跟着设备走的。 */
 var TTS_PREF = 'lucky-draw.tts';
-var TTS = { on:false, lang:'auto', rate:0.95, voices:[], pick:{} };
+var TTS = { on:false, lang:'auto', rate:0.8, voices:[], pick:{} };
 
 /* 各平台常见的女声。拿不准时宁可按这个名单挑,也别随便抓一个男声。 */
 var FEMALE_HINTS = /female|premwadee|kanya|narisa|tingting|ting-ting|huihui|xiaoxiao|yaoyao|mei-?jia|sinji|samantha|zira|susan|karen|moira|tessa|fiona|google ไทย|google 普通话|google 國語/i;
@@ -2473,17 +2474,86 @@ function phraseFor(name, tier, lang){
   return 'ขอแสดงความยินดี ' + (hasTitle ? '' : 'คุณ ') + name +
          ' ได้รับ' + ((tier && tier.th) || 'รางวัล');
 }
-function speak(text, lang){
-  if (!TTS.on || !('speechSynthesis' in window)) return false;
-  var v = pickVoice(lang);
+/* 最近一次播报的结果,显示在设置里 —— 现场没出声时进设置一看就知道卡在哪 */
+TTS.last = null;
+function ttsLast(ok, why){
+  TTS.last = { ok: ok, why: why || '', at: new Date() };
+  renderVoicePick();
+}
+var TTS_ERR = {
+  'not-allowed': '浏览器拦下了(需要先在页面上点一下)',
+  'language-unavailable': '这台设备没有这种语言的语音',
+  'voice-unavailable': '选中的那个声音用不了了',
+  'synthesis-unavailable': '系统语音引擎没开或没装',
+  'synthesis-failed': '系统语音引擎出错',
+  'network': '这个声音要联网,现在连不上',
+  'audio-busy': '声音通道被占用',
+  'audio-hardware': '找不到扬声器 / 音频输出'
+};
+function speak(text, lang, onDone){
+  /* 右上角 🔇 静音时语音也不念 —— 大家都默认那个喇叭管的是**所有**声音 */
+  if (!TTS.on || !A.on || !('speechSynthesis' in window)) return false;
+  /* 每次念之前重新拿一遍声音对象。Android 上 getVoices() 每次返回新对象,
+     用缓存里的旧对象赋给 u.voice,有的机型会**静默失败** —— 不报错,就是不出声。 */
+  var fresh = [];
+  try { fresh = speechSynthesis.getVoices() || []; } catch(e){}
+  var want = pickVoice(lang);
+  var v = want ? (fresh.filter(function(x){ return x.name === want.name; })[0] || want) : null;
+
+  /* 设备上有语音、但偏偏没有这种语言的:不念。
+     拿英文声音去念泰文,出来的是一串怪声,比不念还糟。 */
+  if (!v && fresh.length && !fresh.some(function(x){
+        return (x.lang || '').toLowerCase().replace('_', '-').indexOf(lang) === 0; })){
+    ttsLast(false, '这台设备没有' + (lang === 'zh' ? '中文' : '泰语') + '语音');
+    if (onDone) onDone(false);
+    return false;
+  }
+
   var u = new SpeechSynthesisUtterance(text);
   if (v){ u.voice = v; u.lang = v.lang; }
   else { u.lang = lang === 'zh' ? 'zh-CN' : 'th-TH'; }
   u.rate = TTS.rate;
   u.pitch = 1.05;                      // 略微提一点,女声更明亮
-  try { speechSynthesis.speak(u); } catch(e){ return false; }
+  var started = false;
+  u.onstart = function(){ started = true; ttsLast(true); if (onDone) onDone(true); };
+  u.onerror = function(e){
+    var code = e && e.error;
+    if (code === 'interrupted' || code === 'canceled') return;   // 是我们自己掐的,不算
+    ttsLast(false, TTS_ERR[code] || ('出错了:' + (code || '未知')));
+    if (onDone) onDone(false);
+  };
+  /* Chrome 有时候会卡在「暂停」状态,之后念什么都没声音,先拍一下 */
+  try { speechSynthesis.resume(); } catch(e){}
+  try { speechSynthesis.speak(u); } catch(e){
+    ttsLast(false, '调用失败:' + e.message);
+    if (onDone) onDone(false);
+    return false;
+  }
+  /* 有的浏览器拦下来时既不 onstart 也不 onerror,就是没动静 —— 等 4 秒兜底 */
+  setTimeout(function(){
+    if (!started && !(TTS.last && TTS.last.ok === false && (new Date() - TTS.last.at) < 5000)){
+      ttsLast(false, '没有任何反应(多半是这台设备没装对应语言的语音,或被浏览器拦下了)');
+      if (onDone) onDone(false);
+    }
+  }, 4000);
   return true;
 }
+
+/* 先「解锁」一次。iOS Safari、部分 Android 上,第一次朗读必须发生在用户点击的那一下里;
+   之后程序自己发起的朗读才放行。我们的播报是在揭晓后约 1 秒才念的,不在点击里 ——
+   所以在用户第一次碰屏幕时,先静音念一个空格把它解锁。 */
+var ttsPrimed = false;
+function ttsPrime(){
+  if (ttsPrimed || !TTS.on || !('speechSynthesis' in window)) return;
+  ttsPrimed = true;
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+document.addEventListener('pointerdown', ttsPrime, true);
+document.addEventListener('keydown', ttsPrime, true);
 function announce(person, tier){
   if (!TTS.on) return;
   var lang = TTS.lang;
@@ -2495,7 +2565,7 @@ function ttsStop(){
 }
 function ttsSave(){
   try { localStorage.setItem(TTS_PREF, JSON.stringify({
-    on:TTS.on, lang:TTS.lang, rate:TTS.rate, pick:TTS.pick })); } catch(e){}
+    v:2, on:TTS.on, lang:TTS.lang, rate:TTS.rate, pick:TTS.pick })); } catch(e){}
 }
 function renderVoicePick(){
   var sel = $('#ttsVoice'), note = $('#ttsNote');
@@ -2526,6 +2596,12 @@ function renderVoicePick(){
     note.textContent = '现在用:' + (v ? v.name + ' [' + v.lang + ']' : '默认') +
                        ' · 这台设备共 ' + TTS.voices.length + ' 个语音,其中' +
                        (lang === 'zh' ? '中文' : '泰语') + ' ' + cand.length + ' 个。';
+  }
+  if (TTS.last){
+    var t = TTS.last.at;
+    var hm = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+    note.textContent += '  ·  上次播报(' + hm + '):' +
+      (TTS.last.ok ? '✓ 出声了' : '✗ 没出声 —— ' + TTS.last.why);
   }
 }
 
@@ -2949,9 +3025,14 @@ $('#bTtsTest').onclick = function(){
   var tier = tierById(S.activeTier) || S.tiers[0] ||
              { th:'รางวัลที่ 1', zh:'一等奖' };
   var l = TTS.lang === 'auto' ? (langOfName(who.name) || 'th') : TTS.lang;
-  var ok = speak(phraseFor(who.name, tier, l), l);
-  toast(ok ? 'กำลังพูด · 正在念:' + phraseFor(who.name, tier, l)
-           : 'ไม่สำเร็จ · 念不出来,看下面那行说明');
+  if (!A.on){ toast('เสียงปิดอยู่ · 右上角喇叭是静音状态,语音也不会念。先点一下 🔇 打开'); return; }
+  var text = phraseFor(who.name, tier, l);
+  toast('กำลังพูด · 正在念:' + text);
+  var ok = speak(text, l, function(started){
+    if (!started) toast('ไม่มีเสียง · 没出声:' + (TTS.last ? TTS.last.why : '原因不明') +
+                        ' —— 详细看「语音播报」下面那行说明');
+  });
+  if (!ok && !(TTS.last && TTS.last.ok === false)) toast('ไม่สำเร็จ · 念不出来,看下面那行说明');
   renderVoicePick();
 };
 
@@ -3072,9 +3153,14 @@ renderVersion();
 (function(){
   try {
     var d = JSON.parse(localStorage.getItem(TTS_PREF) || '{}');
-    TTS.on = !!d.on;
+    /* 默认打开 —— 这是你要的功能,不该藏在设置里等人发现。
+       只有用户明确关过(存了 on:false)才保持关闭。 */
+    TTS.on = d.on !== false;
     TTS.lang = ['auto','th','zh'].indexOf(d.lang) >= 0 ? d.lang : 'auto';
-    TTS.rate = (typeof d.rate === 'number' && d.rate >= 0.5 && d.rate <= 1.5) ? d.rate : 0.95;
+    TTS.rate = (typeof d.rate === 'number' && d.rate >= 0.5 && d.rate <= 1.5) ? d.rate : 0.8;
+    /* 旧版默认 0.95,现场反馈太快。存着的还是旧默认值(没有版本号 = 旧格式)
+       就换成新默认 0.8;用户后来自己拉过滑杆的不动。 */
+    if (!d.v && TTS.rate === 0.95) TTS.rate = 0.8;
     TTS.pick = (d.pick && typeof d.pick === 'object') ? d.pick : {};
   } catch(e){}
   $('#ttsOn').checked = TTS.on;
