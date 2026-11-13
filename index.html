@@ -271,11 +271,13 @@ input,select{font:inherit;color:inherit}
   font-size:clamp(21px,calc(3.4vw * var(--sc)),calc(64px * var(--sc)));
   line-height:1.25;letter-spacing:.03em;color:var(--bone);
 }
-/* 副行:第几档、抽了几个 */
+/* 副行:第几档、抽了几个。
+   原来 1.5vw、最小 13px,iPad 竖屏上只有 13px,字距又拉得很开,泰文看不清。
+   现在约是主行的 2/3:iPad 竖屏 18px、1080p 42px;字距收窄,泰文不再一个字母一个字母散开。 */
 .eb-sub{
   font-family:var(--f-util);font-weight:600;
-  font-size:clamp(13px,calc(1.5vw * var(--sc)),calc(30px * var(--sc)));
-  letter-spacing:.16em;color:var(--ash);margin-top:7px;
+  font-size:clamp(15px,calc(2.4vw * var(--sc)),calc(42px * var(--sc)));
+  line-height:1.35;letter-spacing:.05em;color:var(--ash);margin-top:8px;
 }
 .eyebrow b{color:var(--pour);font-weight:700}
 
@@ -988,7 +990,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v46';
+var APP_VERSION = 'v47';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
