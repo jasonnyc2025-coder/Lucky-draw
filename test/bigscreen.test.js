@@ -150,6 +150,7 @@ module.exports = async function run({ url }) {
         return {
           rail: h('.rail'), top: h('.topbar'),
           sub: Math.round(parseFloat(getComputedStyle(document.querySelector('.eb-sub')).fontSize)),
+          subBg: getComputedStyle(document.querySelector('.eb-sub')).backgroundColor,
           stagePct: Math.round(h('#crucible') / innerHeight * 100),
           tiersVisible: [...document.querySelectorAll('.tier')].filter(t => {
             const b = t.getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1; }).length,
@@ -173,6 +174,8 @@ module.exports = async function run({ url }) {
             tab.oneRow && tab.top < 70 && tab.stagePct >= 75, JSON.stringify(tab));
     R.check('平板竖屏:标题下面那行「第几等奖 · 进度」至少 17px(原来 13px 看不清)',
             tab.sub >= 17, tab.sub + 'px');
+    R.check('这一行带一层淡淡的主题色底(像一张标签,和大标题分开)',
+            /rgba\(.+, 0\.1\d?\)/.test(tab.subBg), tab.subBg);
     const ph = await portrait(390, 844, true);
     R.check('手机竖屏:顶栏按钮泰文/中文叠两行,一排放下;奖项条很矮,舞台占 65% 以上',
             ph.oneRow && ph.top < 70 && ph.rail < 60 && ph.noHScroll && ph.stagePct >= 65, JSON.stringify(ph));

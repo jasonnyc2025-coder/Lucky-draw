@@ -276,8 +276,15 @@ input,select{font:inherit;color:inherit}
    现在约是主行的 2/3:iPad 竖屏 18px、1080p 42px;字距收窄,泰文不再一个字母一个字母散开。 */
 .eb-sub{
   font-family:var(--f-util);font-weight:600;
-  font-size:clamp(15px,calc(2.4vw * var(--sc)),calc(42px * var(--sc)));
-  line-height:1.35;letter-spacing:.05em;color:var(--ash);margin-top:8px;
+  /* 同时受宽度和高度限制:1366×768 这种矮屏上舞台本来就紧,太大会把名字卡挤出去 */
+  font-size:clamp(15px,calc(min(2.4vw, 3.2vh) * var(--sc)),calc(42px * var(--sc)));
+  line-height:1.3;letter-spacing:.05em;margin-top:.4em;
+  /* 一层很淡的主题色底(橙 / 金 / 蓝跟着主题走),把这行和上面的大标题分开,像一张标签。
+     底色是半透明的辉光色,文字用亮一档的 --bone,对比度不降反升。 */
+  display:inline-block;padding:.22em .9em;border-radius:.9em;
+  color:var(--bone);
+  background:rgba(var(--glow),.13);
+  border:1px solid rgba(var(--glow),.26);
 }
 .eyebrow b{color:var(--pour);font-weight:700}
 
@@ -990,7 +997,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v47';
+var APP_VERSION = 'v48';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
