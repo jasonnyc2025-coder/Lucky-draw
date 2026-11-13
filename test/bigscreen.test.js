@@ -70,8 +70,10 @@ module.exports = async function run({ url }) {
     R.check('屏幕越大字越大(不再是三种屏幕一个字号)',
             fhd.name > hd.name && uhd.name > fhd.name,
             `1366→${hd.name}px, 1920→${fhd.name}px, 4K→${uhd.name}px`);
-    R.check('1080p 投影上姓名比原来的 104px 上限大得多',
-            fhd.name >= 150, fhd.name + 'px');
+    /* 原来这里要求 ≥150px,其实是靠把姓 ไวยาประโคน 拆成「ไวยา / ประโคน」两行才塞下的;
+       现在名字只在空格处换行,同一个名字整词放得下的最大字号是 ~144px */
+    R.check('1080p 投影上姓名比原来的 104px 上限大得多(而且姓不会被拆成两行)',
+            fhd.name >= 135, fhd.name + 'px');
     R.check('4K 电视上名字卡铺得开(原来只占 31%)',
             uhd.widthPct >= 70, uhd.widthPct + '%');
     R.check('显示比例调大,名字、标题、公司名、奖项名一起变大',
@@ -122,6 +124,57 @@ module.exports = async function run({ url }) {
               getComputedStyle(document.documentElement).getPropertyValue('--sc').trim() === '1' &&
               document.querySelector('#uiScale').value === '100'));
     await ctx.close();
+
+    /* 平板竖屏:原来奖项条每张卡 width:100%,一张卡就占满 122px 高的一整条还要横滑,
+       顶栏折成两行 115px,舞台只剩 65%。现在奖项条是一排小药丸,舞台要占大头。 */
+    const portrait = async (w, h, draw) => {
+      const c = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(700);
+      await pg.evaluate(() => {
+        S.pool = ['ณรงค์ศักดิ์', 'สุทธิพงษ์', 'ประสิทธิ์', 'สุดารัตน์', 'ศักดิ์ชาย', 'ณรงค์'].map(n => ({ name: n, sub: '' }));
+        S.tiers = [{ id: 'a', th: 'รางวัลที่ 3', zh: '三等奖', quota: 6, per: 6 },
+                   { id: 'b', th: 'รางวัลที่ 2', zh: '二等奖', quota: 3, per: 3 },
+                   { id: 'c', th: 'รางวัลที่ 1', zh: '一等奖', quota: 1, per: 1 }];
+        S.winners = []; S.history = [];
+        syncActive(); renderRail(); resetStage(); updateControls();
+      });
+      await pg.waitForTimeout(200);
+      if (draw){ await pg.click('#bPour'); await pg.waitForTimeout(900); await pg.click('#bPour'); await pg.waitForTimeout(5500); }
+      const m = await pg.evaluate(() => {
+        const h = s => Math.round(document.querySelector(s).getBoundingClientRect().height);
+        const rail = document.querySelector('.rail');
+        const btns = [...document.querySelectorAll('.topbar .tbtn')].filter(b => b.offsetParent);
+        return {
+          rail: h('.rail'), top: h('.topbar'),
+          stagePct: Math.round(h('#crucible') / innerHeight * 100),
+          tiersVisible: [...document.querySelectorAll('.tier')].filter(t => {
+            const b = t.getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1; }).length,
+          railScroll: rail.scrollWidth > rail.clientWidth + 1,
+          oneRow: btns.every(b => Math.abs(b.getBoundingClientRect().top - btns[0].getBoundingClientRect().top) < 12),
+          /* 每个名字都是一个词(没有空格):应该一行放完,不能被拆成两行 */
+          wordsWhole: [...document.querySelectorAll('.ingot .nm')].every(n =>
+            n.getBoundingClientRect().height < parseFloat(getComputedStyle(n).fontSize) * 1.7),
+          names: [...document.querySelectorAll('.ingot .nm')].map(n => n.textContent + '@' + getComputedStyle(n).fontSize),
+          nmTooWide: cardsTooWide(document.querySelector('#slots')),
+          noHScroll: document.documentElement.scrollWidth <= innerWidth,
+        };
+      });
+      await c.close();
+      return m;
+    };
+    const tab = await portrait(755, 1000);
+    R.check('平板竖屏:奖项条缩成一排小药丸(<60px),3 个奖项全看得到、不用横滑',
+            tab.rail < 60 && tab.tiersVisible === 3 && !tab.railScroll, JSON.stringify(tab));
+    R.check('平板竖屏:顶栏一行放得下,舞台占屏幕 75% 以上',
+            tab.oneRow && tab.top < 70 && tab.stagePct >= 75, JSON.stringify(tab));
+    const ph = await portrait(390, 844, true);
+    R.check('手机竖屏:顶栏按钮泰文/中文叠两行,一排放下;奖项条很矮,舞台占 65% 以上',
+            ph.oneRow && ph.top < 70 && ph.rail < 60 && ph.noHScroll && ph.stagePct >= 65, JSON.stringify(ph));
+    R.check('手机窄卡上泰文名字不会从词中间拆开(原来 ณรงค์ 变成「ณรง / ค์」)',
+            ph.wordsWhole && !ph.nmTooWide, JSON.stringify(ph));
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {

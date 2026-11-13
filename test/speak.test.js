@@ -192,6 +192,26 @@ module.exports = async function run({ url }) {
             JSON.stringify(await page.evaluate(() => window.__said)));
     await page.click('#bSound'); await page.waitForTimeout(150);          // 打开回来
 
+    // ---------- 正在念的时候按 M:马上闭嘴(揭晓时喇叭按钮被盖住,要能用键盘) ----------
+    await page.evaluate(() => {
+      S.pool = window.__poolCopy.map(x => Object.assign({}, x));
+      S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
+      updateControls(); window.__said = [];
+    });
+    await page.click('#bPour'); await page.waitForTimeout(1000);
+    await page.click('#bPour'); await page.waitForTimeout(3500);
+    await page.evaluate(() => { window.__cancels = 0; });
+    await page.keyboard.press('m'); await page.waitForTimeout(250);
+    const mKey = await page.evaluate(() => ({
+      on: A.on, cancels: window.__cancels,
+      toast: (document.querySelector('#toast') || {}).textContent || '',
+    }));
+    R.check('念到一半按 M:语音马上掐断、声音关掉、提示条说明怎么恢复',
+            !mKey.on && mKey.cancels > 0 && /M/.test(mKey.toast), JSON.stringify(mKey));
+    await page.keyboard.press('m'); await page.waitForTimeout(250);
+    R.check('再按一次 M 声音回来', await page.evaluate(() => A.on) === true);
+    await page.waitForTimeout(2500);
+
     // ---------- 没出声时要能说出原因 ----------
     await page.evaluate(() => { window.__ttsFail = 'language-unavailable'; });
     await page.click('#bSetup'); await page.waitForTimeout(200);
