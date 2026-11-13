@@ -2,7 +2,7 @@
    以及扫描件那种没有文字的 PDF 会不会给出清楚的提示。 */
 'use strict';
 
-const { reporter, chromium, staffRows } = require('./lib/harness');
+const { reporter, chromium, staffRows, menu } = require('./lib/harness');
 
 
 /* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
@@ -33,7 +33,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
     }
 
     // ---------- 1. 文字版 PDF ----------
-    await page.click('#bNames');
+    await menu(page, '#bNames');
     await page.setInputFiles('#file', staffPdf);
     await page.waitForSelector('#mapWrap', { state: 'visible', timeout: 20000 });
 
@@ -98,7 +98,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
     R.check('导入后自动关闭面板', !pool.panelOpen);
 
     // ---------- 3. 扫描件(没有文字层) ----------
-    await page.click('#bNames');
+    await menu(page, '#bNames');
     await page.setInputFiles('#file', blankPdf);
     await page.waitForTimeout(2500);
     const toastTxt = await page.evaluate(() => document.querySelector('#toast').textContent);

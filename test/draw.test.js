@@ -3,7 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 
 /* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
@@ -47,7 +47,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     // ---------- 1. 导入名单 ----------
     if (staffXlsx) {
       R.check('XLSX 组件加载', await page.evaluate(() => typeof XLSX !== 'undefined'));
-      await page.click('#bNames');
+      await menu(page, '#bNames');
       await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible', timeout: 5000 });
       const cols = await page.evaluate(() =>
@@ -62,7 +62,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       // 没装 xlsx 时退回粘贴导入,后面的断言不变
       const lines = Array.from({ length: 60 }, (_, i) =>
         'Tester ' + (i + 1) + ', EMP' + String(i + 1).padStart(3, '0')).join('\n');
-      await page.click('#bNames');
+      await menu(page, '#bNames');
       await page.fill('#paste', lines);
       await page.click('#bApplyPaste');
     }
@@ -87,7 +87,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     R.check('首行标题未被当成人名', !imported.headerLeaked);
 
     // ---------- 2. 奖项设置 ----------
-    await page.click('#bTiers');
+    await menu(page, '#bTiers');
     await page.waitForSelector('#vTiers.on');
     const tierCount = await page.evaluate(() => S.tiers.length);
     for (const [row, quota, per] of [[1, 10, 5], [2, 3, 3], [3, 1, 1]]) {
@@ -276,7 +276,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await page.waitForTimeout(300);
 
     // ---------- 5. 中奖名单面板 ----------
-    await page.click('#bWinners');
+    await menu(page, '#bWinners');
     await page.waitForSelector('#vWinners.on');
     await page.waitForTimeout(300);
     const panel = await page.evaluate(() => {
@@ -308,7 +308,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await closeVeil('#vWinners');
 
     // ---------- 7. 保存进度 ----------
-    await page.click('#bSetup');
+    await menu(page, '#bSetup');
     await page.waitForSelector('#vSetup.on');
     const dl2 = (await Promise.all([page.waitForEvent('download'), page.click('#bSaveProg')]))[0];
     const jsonPath = path.join(fixtures, 'progress.json');
@@ -324,7 +324,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
 
     dialogAction = 'dismiss';
     dialogs.length = 0;
-    await page.click('#bUndo');
+    await menu(page, '#bUndo');
     await page.waitForTimeout(300);
     const cancelled = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
     R.check('撤销会弹确认框', dialogs.length === 1, dialogs[0] && dialogs[0].split('\n')[0]);
@@ -335,7 +335,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             cancelled.w === before.w && cancelled.p === before.p, JSON.stringify(cancelled));
 
     dialogAction = 'accept';
-    await page.click('#bUndo');
+    await menu(page, '#bUndo');
     await page.waitForTimeout(300);
     const undone = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
     R.check('点确定才真的撤销',
@@ -345,7 +345,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     // ---------- 9. 重置(带确认框) ----------
     dialogAction = 'dismiss';
     dialogs.length = 0;
-    await page.click('#bReset');
+    await menu(page, '#bReset');
     await page.waitForTimeout(300);
     const notReset = await page.evaluate(() => S.winners.length);
     R.check('重置会弹确认框且点取消不生效',
@@ -353,13 +353,13 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             (dialogs[0] || '').split('\n')[0] + ' / winners=' + notReset);
 
     dialogAction = 'accept';
-    await page.click('#bReset');
+    await menu(page, '#bReset');
     await page.waitForTimeout(500);
     const reset = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
     R.check('重置后中奖清空、人全部回池', reset.w === 0 && reset.p === 60, JSON.stringify(reset));
 
     // ---------- 10. 从文件恢复进度 ----------
-    await page.click('#bSetup');
+    await menu(page, '#bSetup');
     await page.waitForSelector('#vSetup.on');
     await page.setInputFiles('#progFile', jsonPath);
     await page.waitForTimeout(700);
@@ -384,7 +384,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
             JSON.stringify(stopped));
 
     // ---------- 12. 粘贴导入 ----------
-    await page.click('#bNames');
+    await menu(page, '#bNames');
     await page.waitForSelector('#vNames.on');
     await page.fill('#paste', 'สมชาย ทดสอบ, T001\n测试用户, T002\nTest User, T003');
     await page.click('#bApplyPaste');

@@ -2,7 +2,7 @@
    这里都是真的关闭页面再打开,不是直接改内存状态。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 // 1×1 红点 PNG,当 Logo 用
 const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ' +
@@ -48,7 +48,7 @@ module.exports = async function run({ url, staffXlsx }) {
             await page.textContent('#storeNote'));
 
     // ---------- 造数据 ----------
-    await page.click('#bNames');
+    await menu(page, '#bNames');
     if (staffXlsx) {
       await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible' });
@@ -61,7 +61,7 @@ module.exports = async function run({ url, staffXlsx }) {
     }
     await page.waitForTimeout(400);
 
-    await page.click('#bTiers');
+    await menu(page, '#bTiers');
     await page.waitForSelector('#vTiers.on');
     const ins = await page.$$('#tierRows tr:nth-child(1) input');
     await ins[2].fill('4');
@@ -106,7 +106,7 @@ module.exports = async function run({ url, staffXlsx }) {
     R.check('恢复后能接着抽完这一档', await page.evaluate(() => S.winners.length) === 4);
 
     // ---------- 关掉自动保存 ----------
-    await page.click('#bSetup');
+    await menu(page, '#bSetup');
     await page.waitForSelector('#vSetup.on');
     await page.uncheck('#autoSave');
     await page.waitForTimeout(200);
@@ -122,7 +122,7 @@ module.exports = async function run({ url, staffXlsx }) {
             '关前=' + offCount + ' 重开=' + afterOff.w);
     R.check('开关状态本身也记住了', afterOff.autoSave === false);
 
-    await page.click('#bSetup');
+    await menu(page, '#bSetup');
     await page.waitForSelector('#vSetup.on');
     await page.check('#autoSave');
     await page.waitForTimeout(600);

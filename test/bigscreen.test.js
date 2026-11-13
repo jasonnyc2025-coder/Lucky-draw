@@ -3,7 +3,7 @@
    两边全是黑的,看起来就像把手机界面摆到了大屏中间。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 const ROWS = [
   ['รหัสพนักงาน', 'คำนำหน้า', 'ชื่อ(ไทย)', 'นามสกุล(ไทย)', 'แผนก'],
@@ -26,12 +26,12 @@ module.exports = async function run({ url }) {
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForTimeout(700);
     await page.evaluate(v => applyScale(v, true), scale);
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.fill('#orgMain', 'Bergsoe Metals Co Ltd');
     await page.fill('#orgSub', 'บริษัท เบิร์กโซ เมททัลส์ จำกัด');
     await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
-    await page.click('#bNames'); await page.waitForTimeout(200);
+    await menu(page, '#bNames'); await page.waitForTimeout(200);
     await page.evaluate(r => { S.fromPdf = false; loadRows(r); }, ROWS);
     await page.waitForTimeout(250);
     await page.click('#bApplyFile'); await page.waitForTimeout(350);
@@ -100,7 +100,7 @@ module.exports = async function run({ url }) {
     p.on('pageerror', e => errs.push(e.message));
     await p.goto(url, { waitUntil: 'load' });
     await p.waitForTimeout(800);
-    await p.click('#bSetup'); await p.waitForTimeout(200);
+    await menu(p, '#bSetup'); await p.waitForTimeout(200);
     await p.fill('#uiScale', '150');
     await p.dispatchEvent('#uiScale', 'input');
     await p.waitForTimeout(300);
@@ -117,7 +117,7 @@ module.exports = async function run({ url }) {
             await p.evaluate(() =>
               getComputedStyle(document.documentElement).getPropertyValue('--sc').trim() === '1.5'));
 
-    await p.click('#bSetup'); await p.waitForTimeout(200);
+    await menu(p, '#bSetup'); await p.waitForTimeout(200);
     await p.click('#bScaleReset'); await p.waitForTimeout(300);
     R.check('「恢复 100%」能一键还原',
             await p.evaluate(() =>

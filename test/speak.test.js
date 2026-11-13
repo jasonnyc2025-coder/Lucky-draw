@@ -4,7 +4,7 @@
    什么时候念、什么时候掐断。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 const MOCK = () => {
   const list = [
@@ -121,10 +121,10 @@ module.exports = async function run({ url }) {
             '["th","zh",null]');
 
     // ---------- 真抽一轮 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn'); await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
-    await page.click('#bNames'); await page.waitForTimeout(200);
+    await menu(page, '#bNames'); await page.waitForTimeout(200);
     await page.evaluate(r => { S.fromPdf = false; loadRows(r); }, ROWS);
     await page.waitForTimeout(250);
     await page.click('#bApplyFile'); await page.waitForTimeout(350);
@@ -162,7 +162,7 @@ module.exports = async function run({ url }) {
     await page.click('#bPour'); await page.waitForTimeout(5200);
 
     // ---------- 关掉就不念 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.uncheck('#ttsOn'); await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
     await page.evaluate(() => {
@@ -176,10 +176,10 @@ module.exports = async function run({ url }) {
             JSON.stringify(await page.evaluate(() => window.__said)));
 
     // ---------- 右上角 🔇 静音时语音也不念 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn'); await page.waitForTimeout(150);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
-    await page.click('#bSound'); await page.waitForTimeout(150);          // 静音
+    await menu(page, '#bSound'); await page.waitForTimeout(150);          // 静音
     await page.evaluate(() => {
       S.pool = window.__poolCopy.map(x => Object.assign({}, x));
       S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
@@ -190,7 +190,7 @@ module.exports = async function run({ url }) {
     R.check('右上角喇叭静音时,语音也一起静音',
             await page.evaluate(() => window.__said.length) === 0,
             JSON.stringify(await page.evaluate(() => window.__said)));
-    await page.click('#bSound'); await page.waitForTimeout(150);          // 打开回来
+    await menu(page, '#bSound'); await page.waitForTimeout(150);          // 打开回来
 
     // ---------- 正在念的时候按 M:马上闭嘴(揭晓时喇叭按钮被盖住,要能用键盘) ----------
     await page.evaluate(() => {
@@ -214,7 +214,7 @@ module.exports = async function run({ url }) {
 
     // ---------- 没出声时要能说出原因 ----------
     await page.evaluate(() => { window.__ttsFail = 'language-unavailable'; });
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.click('#bTtsTest'); await page.waitForTimeout(800);
     const diag = await page.evaluate(() => ({
       toast: document.querySelector('#toast').textContent,
@@ -247,7 +247,7 @@ module.exports = async function run({ url }) {
             JSON.stringify(noThai));
 
     // ---------- 设置记在本机 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn');
     await page.selectOption('#ttsLang', 'zh');
     await page.fill('#ttsRate', '110');
@@ -266,7 +266,7 @@ module.exports = async function run({ url }) {
 
     // ---------- 设备上没有对应语言的语音时要说清楚 ----------
     /* 用户明确关掉的,重开后要保持关闭 —— 「默认打开」不能把用户的选择盖掉 */
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.uncheck('#ttsOn'); await page.waitForTimeout(200);
     await page.reload({ waitUntil: 'load' }); await page.waitForTimeout(1200);
     R.check('用户明确关掉的,重开后保持关闭(「默认打开」不会把它盖掉)',
@@ -308,7 +308,7 @@ module.exports = async function run({ url }) {
     p2.on('pageerror', e => errs.push(e.message));
     await p2.goto(url, { waitUntil: 'load' });
     await p2.waitForTimeout(1200);
-    await p2.click('#bSetup'); await p2.waitForTimeout(300);
+    await menu(p2, '#bSetup'); await p2.waitForTimeout(300);
     const note = await p2.evaluate(() => document.querySelector('#ttsNote').textContent);
     R.check('设备上一个语音都没装时,直接告诉用户去哪儿装',
             /一个语音都没装好/.test(note) && /Windows/.test(note), note.slice(0, 60));
@@ -338,7 +338,7 @@ module.exports = async function run({ url }) {
     p3.on('pageerror', e => errs.push(e.message));
     await p3.goto(url, { waitUntil: 'load' });
     await p3.waitForTimeout(1500);
-    await p3.click('#bNames'); await p3.waitForTimeout(500);
+    await menu(p3, '#bNames'); await p3.waitForTimeout(500);
     const quiet = await p3.evaluate(() => new Promise(res => {
       let n = 0; const gv0 = window.__gv;
       const mo = new MutationObserver(l => { n += l.length; });

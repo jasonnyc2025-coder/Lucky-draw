@@ -2,7 +2,7 @@
    名单面板原来只是个导入界面,不显示已经导进去的人 —— 看着像空的。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 module.exports = async function run({ url }) {
   const R = reporter('名单增删改 roster');
@@ -25,7 +25,7 @@ module.exports = async function run({ url }) {
     rows: document.querySelectorAll('#plist .prow').length,
     summary: document.querySelector('#poolSummary').textContent.trim(),
   }));
-  const openNames = async () => { await page.click('#bNames'); await page.waitForTimeout(250); };
+  const openNames = async () => { await menu(page, '#bNames'); await page.waitForTimeout(250); };
   const closeNames = async () => { await page.click('#vNames [data-close]'); await page.waitForTimeout(200); };
 
   try {
@@ -133,7 +133,7 @@ module.exports = async function run({ url }) {
     await closeNames();
 
     // ---------- 7. 改过名的中奖者撤销后,回池子的是新名字 ----------
-    await page.click('#bUndo');
+    await menu(page, '#bUndo');
     await page.waitForTimeout(400);
     R.check('撤销后回到池子里的是改过的名字,不是旧的',
             (await page.evaluate(() => S.pool.filter(x => x.sub === 'ZZZ').map(x => x.name)))[0] === '改过的名字',
@@ -168,7 +168,7 @@ module.exports = async function run({ url }) {
       S.pool.push({ name: '末尾的人', sub: 'LAST9' });
       syncActive(); renderPoolList(); renderRail(); updateControls(); autosave();
     });
-    await p9.click('#bNames'); await p9.waitForTimeout(300);
+    await menu(p9, '#bNames'); await p9.waitForTimeout(300);
 
     const probe = async (q) => {
       await p9.fill('#poolSearch', q);
@@ -230,7 +230,7 @@ module.exports = async function run({ url }) {
                                                tiers: S.tiers.length }));
     R.check('清空前有数据可清', before9.pool + before9.winners > 0, JSON.stringify(before9));
 
-    await p3.click('#bNames'); await p3.waitForTimeout(250);
+    await menu(p3, '#bNames'); await p3.waitForTimeout(250);
 
     // 先点取消
     accept3 = false; dlg3 = [];

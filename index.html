@@ -445,6 +445,21 @@ input,select{font:inherit;color:inherit}
 }
 .app.focus .pour{min-width:0;width:100%;max-width:720px}
 
+/* 结束总榜:只留中间的舞台(Logo + 标题 + 全部中奖者),上下菜单收起来。
+   点一下屏幕菜单才浮出来 —— 浮在上面(position:absolute),不占位置,
+   所以菜单出来、收回去的时候总榜不会重排、不会跳。几秒没动静自动收回。 */
+.app.clean .rail{display:none}
+.app.clean .main{grid-template-columns:1fr;grid-template-rows:1fr}
+.app.clean .topbar,
+.app.clean .controls{
+  position:absolute;left:0;right:0;z-index:30;background:var(--slag);
+  transition:transform .28s ease, opacity .28s ease;opacity:0;pointer-events:none;
+}
+.app.clean .topbar{top:0;transform:translateY(-105%);box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.app.clean .controls{bottom:0;transform:translateY(105%);box-shadow:0 -6px 24px rgba(0,0,0,.45)}
+.app.clean.peek .topbar,
+.app.clean.peek .controls{transform:none;opacity:1;pointer-events:auto}
+
 /* ---------- drawer / modal ---------- */
 .veil{
   position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.9);
@@ -997,7 +1012,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v49';
+var APP_VERSION = 'v50';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1481,6 +1496,25 @@ function setFocus(on){
   if (was !== !!on && typeof fitCards === 'function') fitCards();
 }
 
+/* 结束总榜的「只留中间」模式。peek = 菜单暂时浮出来 */
+var peekTimer = null;
+function setClean(on){
+  var app = document.querySelector('.app');
+  if (!app) return;
+  var was = app.classList.contains('clean');
+  app.classList.toggle('clean', !!on);
+  setPeek(false);
+  if (on && !was) toast('แตะหน้าจอเพื่อแสดงเมนู · 点一下屏幕显示菜单');
+}
+function setPeek(on){
+  var app = document.querySelector('.app');
+  clearTimeout(peekTimer); peekTimer = null;
+  if (!app) return;
+  app.classList.toggle('peek', !!on && app.classList.contains('clean'));
+  if (on) peekTimer = setTimeout(function(){ setPeek(false); }, 6000);
+}
+function peeking(){ var a = document.querySelector('.app'); return !!(a && a.classList.contains('peek')); }
+
 function esc(t){
   return String(t == null ? '' : t).replace(/[&<>]/g, function(c){
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c];
@@ -1509,6 +1543,7 @@ function resetStage(){
 
   /* 全部抽完 → 总榜。要排在「名单为空」前面:人全抽光时 pool 也是空的 */
   if (allDone()){ renderFinalBoard(); return; }
+  setClean(false);              // 不是总榜了(撤销、重置、加了奖项),菜单放回来
 
   if (!S.pool.length){
     eyebrow('นำเข้ารายชื่อก่อนเริ่ม', '<span class="cn">请先导入名单</span>');
@@ -1574,8 +1609,12 @@ function allDone(){
 /* 一屏放不下就把字号往下降一档,降到最小还放不下才允许滚动 */
 /* 总榜的字号阶梯。原来写死从 40px 起,1080p 投影和 4K 电视上一样大 ——
    大屏白白空着。现在起点跟着舞台宽度和显示比例走。 */
-function boardLadder(cruW){
-  var top = Math.min(130, Math.max(40, cruW / 22)) * uiScale();
+/* 起点字号:原来只看舞台宽度。竖屏(iPad 竖放)宽度小、高度富余,总榜下面空一大片;
+   所以也看高度 —— 取「宽/12」和「高/16」里小的那个,横屏时这一项不会比「宽/22」大,不受影响。
+   起点大了没关系,后面会一档一档缩到放得下。 */
+function boardLadder(cruW, cruH){
+  var tall = cruH ? Math.min(cruW / 12, cruH / 16) : 0;
+  var top = Math.min(130, Math.max(40, cruW / 22, tall)) * uiScale();
   var out = [], v = top;
   while (v > 12){ out.push(Math.round(v)); v *= 0.85; }
   out.push(11);
@@ -1589,11 +1628,12 @@ function fitBoard(board){
                 parseFloat(getComputedStyle(hd).marginBottom || 0) : 0;
     var avail = cru.clientHeight - eb.offsetHeight - headH - 56;
     board.style.maxHeight = Math.max(160, avail) + 'px';
-    var sizes = boardLadder(cru.clientWidth);
+    var sizes = boardLadder(cru.clientWidth, cru.clientHeight);
     for (var i = 0; i < sizes.length; i++){
       board.style.setProperty('--bfs', sizes[i] + 'px');
       void board.offsetHeight;                  // 强制回流,别读到上一档的旧高度
-      if (board.scrollHeight <= board.clientHeight) break;
+      /* 高度放得下,而且没有哪个长名字把总榜撑宽 */
+      if (board.scrollHeight <= board.clientHeight && board.scrollWidth <= board.clientWidth + 1) break;
     }
   }
   run();
@@ -1634,6 +1674,7 @@ function renderFinalBoard(){
   board.innerHTML = '';
   groups.forEach(function(g){ board.appendChild(g); });
 
+  setClean(true);               // 先收起菜单,再按收起后的舞台高度排总榜
   slots.appendChild(board);
   fitBoard(board);
   fwStart('loop');
@@ -1668,6 +1709,7 @@ function startRoll(){
   S.frame = null; S.shown = null; S.revealing = false;
   fwStop();
   ttsStop();                    // 上一轮没念完的掐掉,别压着新一轮
+  setClean(false);
   S.rolling = true;
   setFocus(true);
   S.rank = rank;
@@ -3219,6 +3261,7 @@ document.addEventListener('keydown', function(e){
   }
   if (e.key === 'Escape'){
     var v = document.querySelector('.veil.on'); if (v) v.classList.remove('on');
+    else if (peeking()) setPeek(false);
   }
   if (e.key === 'f' || e.key === 'F'){ $('#bFull').click(); }
   /* M = 静音 / 开声音。抽奖滚动和揭晓的时候是专注模式,顶栏(连同 🔇)收起来了,
@@ -3228,6 +3271,26 @@ document.addEventListener('keydown', function(e){
     toast(A.on ? 'เปิดเสียง · 声音已打开(按 M 静音)' : 'ปิดเสียง · 已静音,语音也停了(再按 M 打开)');
   }
 });
+/* 总榜只留中间:点一下舞台,上下菜单浮出来;再点一下(或 6 秒不动)收回去。
+   点到舞台上本来就能点的东西(换 Logo 等)不算。 */
+$('#crucible').addEventListener('click', function(e){
+  if (!document.querySelector('.app.clean')) return;
+  if (e.target.closest('button, a, input, label, select, #shLogo')) return;
+  setPeek(!peeking());
+});
+/* 菜单浮出来以后,在菜单上操作就别让它自己收回去 */
+['.topbar', '.controls'].forEach(function(sel){
+  document.querySelector(sel).addEventListener('pointerdown', function(){
+    if (peeking()) setPeek(true);
+  });
+});
+/* 笔记本上不用点:鼠标移到屏幕最上沿或最下沿,菜单就出来 */
+document.addEventListener('pointermove', function(e){
+  if (e.pointerType !== 'mouse') return;   // 触屏点一下也会补发移动事件,别和「点一下」打架
+  if (!document.querySelector('.app.clean') || peeking()) return;
+  if (e.clientY < 70 || e.clientY > innerHeight - 90) setPeek(true);
+});
+
 /* 转屏、地址栏收起、拖动窗口都会连续触发 resize。防抖 150ms 再重排:
    一来不用反复重建 DOM,二来中途的布局是不稳定的,量出来的高度会偏小,
    总榜会被缩得过小。 */

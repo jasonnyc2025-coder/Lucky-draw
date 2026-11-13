@@ -3,7 +3,7 @@
    结果总榜上大字是工号、小字是「นาย」,人名根本没出现。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 /* 现场那份真名单的表头(工号 / 称谓 / 名 / 姓 / 部门)。
    部门那列必须被排除 —— 拼进名字里会变成「นาย อร่าม จันพางาม ตะกั่วอัลลอย-โรง2」。 */
@@ -35,7 +35,7 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(800);
 
     // ---------- 1. 列映射 ----------
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     await page.evaluate(rows => { S.fromPdf = false; loadRows(rows); }, ROWS);
     await page.waitForTimeout(400);
 
@@ -75,7 +75,7 @@ module.exports = async function run({ url }) {
             pool[0] === 'นางสาว สมชาย ใจดี|15000', JSON.stringify(pool));
 
     // ---------- 1.5 按表头认列(现场那份真名单) ----------
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     await page.evaluate(rows => { S.fromPdf = false; loadRows(rows); }, REAL);
     await page.waitForTimeout(400);
     const real = await page.evaluate(() => colRoles());
@@ -130,6 +130,35 @@ module.exports = async function run({ url }) {
     R.check('结束画面「共几位中奖者」那行泰文、中文都有(原来只有中文)',
             /ผู้โชคดี\s*6\s*คน/.test(board.ebSub) && /6\s*位中奖者/.test(board.ebSub), board.ebSub);
 
+    // ---------- 2.2 总榜只留中间,点一下屏幕菜单才出来 ----------
+    const bars = () => page.evaluate(() => {
+      const r = s => document.querySelector(s).getBoundingClientRect();
+      const b = document.querySelector('.board').getBoundingClientRect();
+      return { clean: !!document.querySelector('.app.clean'),
+               topHidden: r('.topbar').bottom <= 1, ctlHidden: r('.controls').top >= innerHeight - 1,
+               railHidden: getComputedStyle(document.querySelector('.rail')).display === 'none',
+               boardTop: Math.round(b.top), boardH: Math.round(b.height) };
+    });
+    const b0 = await bars();
+    R.check('总榜出来后上下菜单、奖项列表都收起来,只留中间',
+            b0.clean && b0.topHidden && b0.ctlHidden && b0.railHidden, JSON.stringify(b0));
+    const vp = page.viewportSize();
+    await page.mouse.click(Math.round(vp.width / 2), Math.round(vp.height * 0.75));
+    await page.waitForTimeout(450);
+    const b1 = await bars();
+    R.check('点一下屏幕,上下菜单浮出来',
+            !b1.topHidden && !b1.ctlHidden, JSON.stringify(b1));
+    R.check('菜单浮在上面,总榜不重排、不跳',
+            b1.boardTop === b0.boardTop && b1.boardH === b0.boardH, JSON.stringify({ b0, b1 }));
+    await page.mouse.click(Math.round(vp.width / 2), Math.round(vp.height * 0.75));
+    await page.waitForTimeout(450);
+    const b2 = await bars();
+    R.check('再点一下收回去', b2.topHidden && b2.ctlHidden, JSON.stringify(b2));
+    await page.mouse.click(Math.round(vp.width / 2), Math.round(vp.height * 0.75));
+    await page.waitForTimeout(6700);
+    const b3 = await bars();
+    R.check('不去碰它,6 秒后自己收回去', b3.topHidden && b3.ctlHidden, JSON.stringify(b3));
+
     // ---------- 2.5 工号要看得清 ----------
     /* 原来工号那行是固定 10-18px,名字最大 104px,差了五六倍,投影上看不清。
        现在跟着名字一起缩放,至少是名字的四分之一。 */
@@ -166,7 +195,7 @@ module.exports = async function run({ url }) {
         return { fits: b.scrollHeight <= b.clientHeight,
                  bfs: getComputedStyle(b).getPropertyValue('--bfs').trim() };
       });
-      await page.click('#bSetup'); await page.waitForTimeout(220);
+      await menu(page, '#bSetup'); await page.waitForTimeout(220);
       await page.fill('#orgMain', 'บริษัท ทดสอบ จำกัด');
       await page.fill('#orgSub', '测试公司');
       await page.waitForTimeout(400);
@@ -202,16 +231,23 @@ module.exports = async function run({ url }) {
     R.check('粒子数不会无限涨(放久了也不卡)', grown < 1400, 'parts=' + grown);
 
     // 撤销离开总榜 → 烟花要收掉
-    await page.click('#bUndo'); await page.waitForTimeout(900);
+    await menu(page, '#bUndo'); await page.waitForTimeout(900);
     const after = await page.evaluate(() => ({
       on: document.querySelector('#fw').classList.contains('on'),
       running: !!FW.raf, parts: FW.parts.length,
     }));
     R.check('离开总榜后烟花停掉,不会在后台一直烧 CPU',
             !after.on && !after.running && after.parts === 0, JSON.stringify(after));
+    const back = await page.evaluate(() => ({
+      clean: !!document.querySelector('.app.clean'),
+      top: Math.round(document.querySelector('.topbar').getBoundingClientRect().top),
+      ctlInFlow: getComputedStyle(document.querySelector('.controls')).position !== 'absolute',
+    }));
+    R.check('从总榜撤销回去,上下菜单恢复常驻(不用再点屏幕)',
+            !back.clean && back.top >= 0 && back.ctlInFlow, JSON.stringify(back));
 
     // ---------- 4. 开关 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.uncheck('#fwOn'); await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
     await page.click('#bPour'); await page.waitForTimeout(900);
@@ -231,7 +267,7 @@ module.exports = async function run({ url }) {
 
     // ---------- 5. 每抽完一轮也放一次,放完自己收 ----------
     await page.evaluate(() => { FW.on = true; });
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#fwOn'); await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
     await page.evaluate(() => {

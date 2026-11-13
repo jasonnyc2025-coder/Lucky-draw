@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -38,7 +38,7 @@ module.exports = async function run({ url }) {
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForTimeout(700);
 
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     await page.fill('#paste', Array.from({ length: 12 },
       (_, i) => `测试${i + 1}, T${i + 1}`).join('\n'));
     await page.click('#bApplyPaste'); await page.waitForTimeout(400);
@@ -46,7 +46,7 @@ module.exports = async function run({ url }) {
     R.check('默认开着音效', await page.evaluate(() => A.on === true));
 
     // 试听按钮
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.click('#bTestSnd'); await page.waitForTimeout(400);
     R.check('「试听」能建起 AudioContext',
             await page.evaluate(() => !!A.ctx && A.ctx.state !== 'closed'),

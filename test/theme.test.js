@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -73,7 +73,7 @@ module.exports = async function run({ url }) {
             await page.evaluate(() => S.theme === 'forge' &&
                                       !document.documentElement.getAttribute('data-theme')));
 
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.click('.theme[data-t="gala"]'); await page.waitForTimeout(400);
     let st = await page.evaluate(() => ({
       theme: S.theme,
@@ -152,7 +152,7 @@ module.exports = async function run({ url }) {
     R.check('舞台上这张明显比顶栏那张大(投影上要看得见)',
             bigH.big >= bigH.bar * 1.5, bigH.big + 'px vs 顶栏 ' + bigH.bar + 'px');
 
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.fill('#orgMain', 'บริษัท ตัวอย่าง จำกัด');
     await page.fill('#orgSub', '示例公司');
     await page.waitForTimeout(350);
@@ -188,7 +188,7 @@ module.exports = async function run({ url }) {
             pos.gapToTitle > 40, '抬头到标题 ' + pos.gapToTitle + 'px');
 
     // 滚动时要收起来,把高度让给名字
-    await page.click('#bNames'); await page.waitForTimeout(220);
+    await menu(page, '#bNames'); await page.waitForTimeout(220);
     await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
     await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     await page.click('#bPour'); await page.waitForTimeout(900);
@@ -201,7 +201,7 @@ module.exports = async function run({ url }) {
               getComputedStyle(document.querySelector('#stageHead')).display === 'flex'));
 
     // ---------- 换名单不该动 Logo 和主题 ----------
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
     await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     R.check('导入新名单不会动 Logo、公司名和主题',

@@ -2,7 +2,7 @@
    Excel 里同一个人出现两次。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 module.exports = async function run({ url }) {
   const R = reporter('边角情况 edge');
@@ -22,7 +22,7 @@ module.exports = async function run({ url }) {
     return p;
   };
   const paste = async (p, lines) => {
-    await p.click('#bNames'); await p.waitForTimeout(220);
+    await menu(p, '#bNames'); await p.waitForTimeout(220);
     await p.fill('#paste', lines.join('\n'));
     await p.click('#bApplyPaste'); await p.waitForTimeout(400);
   };

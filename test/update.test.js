@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 module.exports = async function run({ url, fixtures }) {
   const R = reporter('自动更新 update');
@@ -102,7 +102,7 @@ module.exports = async function run({ url, fixtures }) {
     await page.waitForTimeout(1800);
 
     // 打开名单面板 = 可能正在粘名单,这时候绝不能刷新
-    await page.click('#bNames'); await page.waitForTimeout(300);
+    await menu(page, '#bNames'); await page.waitForTimeout(300);
     await page.fill('#paste', '正在输入的名单, X1');
     await page.evaluate(() => { window.__alive = Date.now(); });
 
@@ -127,7 +127,7 @@ module.exports = async function run({ url, fixtures }) {
     if (await page.isVisible('#vNames [data-close]')){
       await page.click('#vNames [data-close]'); await page.waitForTimeout(300);
     }
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.click('#bUpdate');
     const manual = await until(page, () => window.swVersion === 'v-next-2', 30000);
     R.check('手动点「有新版本」确实能更新(回归:以前按钮亮着点了没反应)', manual,
@@ -142,7 +142,7 @@ module.exports = async function run({ url, fixtures }) {
     await controlled(page);
     await page.waitForTimeout(1800);
 
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     await page.fill('#paste', Array.from({ length: 20 }, (_, i) => `人${i + 1}, P${i + 1}`).join('\n'));
     await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     await page.click('#bPour'); await page.waitForTimeout(600);

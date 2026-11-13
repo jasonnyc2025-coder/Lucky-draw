@@ -222,5 +222,15 @@ function chromium() {
   };
 }
 
-module.exports = { ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,
+
+/* 结束总榜会把上下菜单收起来(点一下屏幕才浮出来)。
+   测试里点菜单按钮之前先让菜单浮出来 —— 跟现场的人先点一下屏幕是一样的;不在总榜时什么都不做。 */
+async function menu(page, sel){
+  await page.evaluate(() => {
+    if (document.querySelector('.app.clean') && typeof setPeek === 'function') setPeek(true);
+  });
+  await page.click(sel);
+}
+
+module.exports = { menu, ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,
                    staffRows, reporter, chromium };
