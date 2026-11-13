@@ -997,7 +997,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v48';
+var APP_VERSION = 'v49';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1609,7 +1609,8 @@ function renderFinalBoard(){
   slots.style.gridTemplateColumns = '1fr';
   slots.classList.add('wide');
   eyebrow('จบการจับรางวัล · <span class="cn">全部抽奖完成</span>',
-          '<b>' + S.winners.length + '</b> <span class="cn">位中奖者</span>');
+          'ผู้โชคดี <b>' + S.winners.length + '</b> คน · ' +
+          '<span class="cn">共 <b>' + S.winners.length + '</b> 位中奖者</span>');
 
   var board = el('div','board');
   var last = S.tiers.length - 1;
@@ -1617,7 +1618,7 @@ function renderFinalBoard(){
     var ws = S.winners.filter(function(w){ return w.tierId === t.id; });
     if (!ws.length) return;
     var g = el('div','bgrp' + (i === last ? ' top' : ''));
-    g.appendChild(el('div','bgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน'));
+    g.appendChild(el('div','bgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน / 人'));
     var grid = el('div','bnames');
     ws.forEach(function(w){
       var c = el('div','bname');
@@ -2377,7 +2378,7 @@ function renderWinners(){
     var ws = S.winners.filter(function(x){ return x.tierId === t.id; });
     if (!ws.length) return;
     var g = el('div','wgrp');
-    g.appendChild(el('div','wgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน'));
+    g.appendChild(el('div','wgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน / 人'));
     var grid = el('div','wrows');
     ws.forEach(function(x, i){
       var r = el('div','wrow');

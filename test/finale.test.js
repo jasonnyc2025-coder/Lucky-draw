@@ -119,6 +119,7 @@ module.exports = async function run({ url }) {
       exists: !!document.querySelector('.board'),
       names: [...document.querySelectorAll('.board .bname b')].map(e => e.textContent),
       subs: [...document.querySelectorAll('.board .bname span')].map(e => e.textContent),
+      ebSub: (document.querySelector('.eb-sub') || {}).textContent || '',
     }));
     R.check('总榜上大字是人名,不是工号',
             board.names.length === 6 && board.names.every(n => /[฀-๿一-龥A-Za-z]/.test(n) && !/^\d+$/.test(n)),
@@ -126,6 +127,8 @@ module.exports = async function run({ url }) {
     R.check('工号跟在名字下面一起显示',
             board.subs.length === 6 && board.subs.every(v => /^\d{5}$/.test(v)),
             JSON.stringify(board.subs));
+    R.check('结束画面「共几位中奖者」那行泰文、中文都有(原来只有中文)',
+            /ผู้โชคดี\s*6\s*คน/.test(board.ebSub) && /6\s*位中奖者/.test(board.ebSub), board.ebSub);
 
     // ---------- 2.5 工号要看得清 ----------
     /* 原来工号那行是固定 10-18px,名字最大 104px,差了五六倍,投影上看不清。
