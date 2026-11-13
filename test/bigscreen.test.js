@@ -176,6 +176,50 @@ module.exports = async function run({ url }) {
     R.check('手机窄卡上泰文名字不会从词中间拆开(原来 ณรงค์ 变成「ณรง / ค์」)',
             ph.wordsWhole && !ph.nmTooWide, JSON.stringify(ph));
 
+    /* 滚动中名字上下跳:长名字(称谓 + 名 + 姓)折两行、短名字一行,
+       卡片忽高忽矮,又是垂直居中的 —— iPad 竖屏实测上下跳 50px。现在整轮锁住高度。 */
+    const rollJitter = async (w, h, per) => {
+      const c = await browser.newContext({ viewport: { width: w, height: h }, isMobile: w < h, hasTouch: w < h });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(700);
+      await pg.evaluate(per => {
+        S.pool = ['อัศวิน', 'มาลี', 'นาย ณรงค์ศักดิ์ บรรดาศักดิ์', 'นางสาว พัชรินทร์ ไวยาประโคน',
+                  'อุดม', 'สมชาย ใจดี', 'ผดุง', 'วิภาดา ศรีสุข', '李明华', 'สุทธิพงษ์']
+          .map(n => ({ name: n, sub: '' }));
+        S.tiers = [{ id: 'a', th: 'รางวัลที่ 3', zh: '三等奖', quota: 6, per: per }];
+        S.winners = []; S.history = [];
+        syncActive(); renderRail(); resetStage(); updateControls();
+      }, per);
+      await pg.click('#bPour'); await pg.waitForTimeout(300);
+      const m = await pg.evaluate(() => new Promise(res => {
+        const tops = new Set(), hs = new Set(), fs = new Set(); let n = 0, clipped = false;
+        (function f(){
+          const slots = document.querySelector('#slots');
+          const dy = parseFloat((slots.style.transform.match(/,\s*(-?[\d.]+)px/) || [0, 0])[1]);
+          slots.querySelectorAll('.ingot').forEach(card => {
+            const r = card.getBoundingClientRect();
+            tops.add(Math.round(r.top - dy)); hs.add(Math.round(r.height));
+            const nm = card.querySelector('.nm');
+            fs.add(getComputedStyle(nm).fontSize);
+            if (nm.scrollWidth > nm.clientWidth + 1) clipped = true;
+          });
+          if (++n < 200) requestAnimationFrame(f);
+          else res({ tops: [...tops].length, heights: [...hs], fonts: [...fs], clipped });
+        })();
+      }));
+      await c.close();
+      return m;
+    };
+    const jPad = await rollJitter(755, 1000, 1);
+    R.check('iPad 竖屏单人抽:滚动中名字卡不再上下跳(位置、高度、字号整轮不变)',
+            jPad.tops === 1 && jPad.heights.length === 1 && jPad.fonts.length === 1 && !jPad.clipped,
+            JSON.stringify(jPad));
+    const jTv = await rollJitter(1920, 1080, 6);
+    R.check('投影一次抽 6 人:每张卡高度一致、整轮不跳',
+            jTv.heights.length === 1 && jTv.fonts.length === 1 && !jTv.clipped, JSON.stringify(jTv));
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();

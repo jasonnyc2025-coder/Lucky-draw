@@ -988,7 +988,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v45';
+var APP_VERSION = 'v46';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1384,6 +1384,10 @@ function cardsTooWide(slots){
   return false;
 }
 function fitCards(){
+  if (S.rolling) fitRolling(); else fitNow();
+}
+/* 按卡里现在的名字量一次 */
+function fitNow(){
   var slots = $('#slots');
   if (!slots || !slots.children.length) return;
   var avail = stageAvail();
@@ -1399,21 +1403,56 @@ function fitCards(){
     void slots.offsetHeight;                   // 强制回流,别读到上一档的旧高度
   }
 }
-/* 滚动过程中名字一直在换,长短不一,每帧量一次会忽大忽小。
-   所以开抽前先拿池子里最长的名字量一遍,整轮用同一个字号。 */
-function fitRoundByLongest(cards, sz){
-  if (!cards.length) return;
-  var longest = '';
+/* 滚动过程中名字一直在换,长短不一:
+   ① 每帧量一次字号会忽大忽小 —— 所以整轮用同一个字号,按池子里「最难放」的名字定;
+   ② 长名字(称谓 + 名 + 姓)折成两行、短名字一行,卡片一会儿高一会儿矮,
+      卡片在舞台里是垂直居中的,名字就跟着上下跳(iPad 竖屏实测跳 50px)——
+      所以再按最高的那种情况把卡片高度锁住(min-height),整轮不变。
+   「最难放」有两种:总字数最多的(行数最多),和单个词最长的(最宽、拆不开),两个都量,取小的字号。 */
+function fitRolling(){
+  var slots = $('#slots');
+  if (!slots) return;
+  var cards = slots.querySelectorAll('.ingot.roll .nm');
+  if (!cards.length){ fitNow(); return; }
+  var longest = '', widest = '', wlen = 0;
   for (var i = 0; i < S.pool.length; i++){
     var nm = S.pool[i].name || '';
     if (nm.length > longest.length) longest = nm;
+    var toks = nm.split(/\s+/);
+    for (var t = 0; t < toks.length; t++) if (toks[t].length > wlen){ wlen = toks[t].length; widest = nm; }
   }
-  if (!longest) return;
-  var keep = [];
-  for (var c = 0; c < cards.length; c++){ keep.push(cards[c].textContent); cards[c].textContent = longest; }
-  fitCards();
-  for (var d = 0; d < cards.length; d++) cards[d].textContent = keep[d];
+  var keep = [], c;
+  for (c = 0; c < cards.length; c++){ keep.push(cards[c].textContent); cards[c].parentNode.style.minHeight = ''; }
+  var cands = longest ? (widest && widest !== longest ? [longest, widest] : [longest]) : [];
+  var put = function(txt){ for (var j = 0; j < cards.length; j++) cards[j].textContent = txt; };
+  var best = null;
+  cands.forEach(function(txt){
+    put(txt); fitNow();
+    var f = parseFloat(slots.style.getPropertyValue('--fit')) || 1;
+    if (best === null || f < best) best = f;
+  });
+  if (best !== null){
+    slots.style.setProperty('--fit', best.toFixed(3));
+    var h = 0;
+    cands.forEach(function(txt){
+      put(txt); void slots.offsetHeight;
+      for (var j = 0; j < cards.length; j++) h = Math.max(h, cards[j].parentNode.offsetHeight);
+    });
+    S.lockH = h;
+    for (c = 0; c < cards.length; c++) cards[c].parentNode.style.minHeight = h + 'px';
+  }
+  for (c = 0; c < cards.length; c++) cards[c].textContent = keep[c];
 }
+/* 保险:万一某个名字比量过的还高,把锁也抬上去(只升不降,最多跳一次) */
+function keepRollHeight(cards){
+  var h = 0;
+  for (var j = 0; j < cards.length; j++) h = Math.max(h, cards[j].parentNode.offsetHeight);
+  if (h > (S.lockH || 0) + 1){
+    S.lockH = h;
+    for (var k = 0; k < cards.length; k++) cards[k].parentNode.style.minHeight = h + 'px';
+  }
+}
+function fitRoundByLongest(){ fitRolling(); }
 
 function sizeFor(n){
   if (n <= 1) return {nm:clampPx(40, 8.5, 190), sub:clampPx(20, 2.6, 62), cols:1};
@@ -1669,6 +1708,7 @@ function startRoll(){
       for (var c = 0; c < cards.length; c++){
         cards[c].textContent = S.frame[c].name;
       }
+      keepRollHeight(cards);
     }
     S.raf = requestAnimationFrame(frame);
   })(performance.now());
