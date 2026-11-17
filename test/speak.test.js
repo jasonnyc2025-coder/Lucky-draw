@@ -61,6 +61,15 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(900);
 
     R.check('读到设备上的语音列表', await page.evaluate(() => TTS.voices.length) === 6);
+    const fold = await page.evaluate(() => ({
+      open: document.querySelector('#ttsMore').open,
+      sum: document.querySelector('#ttsSum').textContent,
+      icons: [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden)
+               .every(e => !!e.querySelector('.sec-h .sec-ic')),
+    }));
+    R.check('语言 / 声音 / 语速平时折成一行,只显示当前设置',
+            fold.open === false && /自动.*80%/.test(fold.sum), JSON.stringify(fold));
+    R.check('设置里每一块标题前都有图标,一眼分得开', fold.icons === true);
     /* 原来默认关着,得进设置去找 —— 用户以为功能坏了 */
     R.check('语音播报默认是打开的(不用进设置去找)',
             await page.evaluate(() => TTS.on === true && document.querySelector('#ttsOn').checked));
@@ -249,6 +258,7 @@ module.exports = async function run({ url }) {
     // ---------- 设置记在本机 ----------
     await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn');
+    await page.evaluate(() => { document.querySelector('#ttsMore').open = true; });   // 语言 / 语速平时折起来
     await page.selectOption('#ttsLang', 'zh');
     await page.fill('#ttsRate', '110');
     await page.dispatchEvent('#ttsRate', 'input');

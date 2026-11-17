@@ -564,6 +564,28 @@ details.fold:not([open]) > summary{margin-bottom:0;padding-bottom:0;border-botto
 details.fold:not([open]) > summary::after{transform:rotate(-90deg)}
 .fold-hint{font-size:12.5px;letter-spacing:0;color:var(--ash)}
 .howto{margin-top:14px}
+.ttsmore{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+
+/* 设置面板:每一块要一眼分得开(原来几块长得一模一样,连成一片)。
+   · 标题前一个图标、字更大更亮,标题那一条垫一层淡淡的主题色底;
+   · 左边一条主题色竖线;块与块之间拉开距离。 */
+#vSetup .sec{border-left:3px solid var(--pour);padding-top:0;overflow:hidden}
+#vSetup .sec + .sec{margin-top:22px}
+#vSetup .sec-h{
+  display:flex;align-items:center;gap:10px;
+  margin:0 -18px 16px;padding:12px 18px;
+  font-size:16px;font-weight:700;letter-spacing:.04em;color:var(--whitehot);
+  background:rgba(var(--glow),.10);border-bottom:1px solid rgba(var(--glow),.22);
+}
+#vSetup .sec-ic{font-style:normal;font-size:19px;line-height:1;flex:none}
+.ttsmore > summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px;
+  font-size:13.5px;color:var(--ash);padding:4px 0}
+.ttsmore > summary::-webkit-details-marker{display:none}
+.ttsmore > summary > span{flex:1 1 auto;min-width:0}
+.ttsmore > summary > b{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--bone);font-weight:600}
+.ttsmore > summary::after{content:'▾';color:var(--pour);transition:transform .2s}
+.ttsmore:not([open]) > summary::after{transform:rotate(-90deg)}
 .howto > summary{cursor:pointer;font-size:14px;color:var(--ash);list-style:none;padding:4px 0}
 .howto > summary::-webkit-details-marker{display:none}
 .howto[open] > summary{color:var(--bone)}
@@ -711,6 +733,8 @@ td input{padding:9px 10px;font-size:15px}
   .veil{padding-left:10px;padding-right:10px}
   .panel-b{padding:14px}
   .sec{padding:14px 14px 16px}
+  #vSetup .sec{padding-top:0}
+  #vSetup .sec-h{margin:0 -14px 14px;padding:11px 14px;font-size:15px}
   .act{flex:1 1 0;min-width:0;font-size:15px;padding:12px 8px}
   .drop{padding:18px 12px}
   /* 奖项表:去掉上下箭头后把地方让给输入框,名字不再被截成「ราง:」 */
@@ -959,7 +983,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec" id="logoSec">
-        <div class="sec-h">โลโก้บริษัท · 公司 Logo</div>
+        <div class="sec-h"><i class="sec-ic">🏢</i>โลโก้บริษัท · 公司 Logo</div>
         <div class="row">
           <label class="filepick">เลือกรูป 上传 / 更换 Logo<input type="file" id="logoFile" accept="image/*" hidden></label>
           <button class="ghost" id="bClearLogo">ลบ 清除</button>
@@ -974,7 +998,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec" id="lockSec">
-        <div class="sec-h">รหัสผ่านผู้ดูแล · 管理密码</div>
+        <div class="sec-h"><i class="sec-ic">🔒</i>รหัสผ่านผู้ดูแล · 管理密码</div>
         <p class="hint" style="margin:0 0 12px" id="lockState">…</p>
         <div class="row">
           <label class="fld"><span>รหัสใหม่ · 新密码</span><input type="password" id="pwNew" autocomplete="new-password" placeholder="至少 4 位"></label>
@@ -991,7 +1015,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       <!-- 平时不显示(用户要求设置里别放这一块)。只有「新版本没能自动装上」时才露出来,
            里面也只显示「有新版本,点此更新」那一个按钮。 -->
       <div class="sec" id="appSec" hidden>
-        <div class="sec-h">แอป · 应用</div>
+        <div class="sec-h"><i class="sec-ic">⬆️</i>แอป · 应用</div>
         <div class="row">
           <button class="solid" id="bInstall2" style="display:none" hidden>ติดตั้งลงเครื่อง 安装到设备</button>
           <button class="ghost" id="bUpdate" style="display:none">มีเวอร์ชันใหม่ 有新版本,点此更新</button>
@@ -1024,11 +1048,14 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec">
-        <div class="sec-h">ประกาศด้วยเสียง · 语音播报</div>
+        <div class="sec-h"><i class="sec-ic">🗣️</i>ประกาศด้วยเสียง · 语音播报</div>
         <div class="row">
           <label class="chk"><input type="checkbox" id="ttsOn"> ประกาศชื่อผู้โชคดี · 念出中奖人的名字</label>
           <button class="ghost" id="bTtsTest" style="margin-left:auto">ทดสอบ 试听</button>
         </div>
+        <!-- 语言 / 声音 / 语速一般都留「自动」,平时折起来,只显示当前设置;点开才调 -->
+        <details class="ttsmore" id="ttsMore">
+        <summary><span>ภาษา / เสียง / ความเร็ว · 语言 / 声音 / 语速</span><b id="ttsSum"></b></summary>
         <div class="row" style="margin-top:12px">
           <label class="fld" style="min-width:150px"><span>ภาษา · 语言</span>
             <select id="ttsLang">
@@ -1043,10 +1070,11 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
                    style="accent-color:var(--pour);padding:0;border:none;background:none"></label>
         </div>
         <p class="hint" id="ttsNote" style="margin-top:12px">…</p>
+        </details>
       </div>
 
       <div class="sec">
-        <div class="sec-h">จอใหญ่ · 大屏 / 投影</div>
+        <div class="sec-h"><i class="sec-ic">📺</i>จอใหญ่ · 大屏 / 投影</div>
         <div class="row">
           <label class="fld" style="min-width:230px">
             <span>ขนาดการแสดงผล · 显示比例 <b id="uiScaleVal" style="color:var(--pour)">100%</b></span>
@@ -1058,7 +1086,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec">
-        <div class="sec-h">ธีมสี · 配色主题</div>
+        <div class="sec-h"><i class="sec-ic">🎨</i>ธีมสี · 配色主题</div>
         <div class="themes" id="themes">
           <button class="theme" data-t="forge">
             <span class="sw"><i style="background:#221C19"></i><i style="background:#FF8A1F"></i><i style="background:#EFE8E0"></i></span>
@@ -1079,7 +1107,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec">
-        <div class="sec-h">เสียง · 音效</div>
+        <div class="sec-h"><i class="sec-ic">🎵</i>เสียง · 音效</div>
         <div class="row">
           <label class="chk"><input type="checkbox" id="sndOn" checked> เปิดเสียง · 开启音效</label>
           <label class="fld" style="max-width:220px">
@@ -1105,7 +1133,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v63';
+var APP_VERSION = 'v64';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2937,6 +2965,17 @@ function renderVoicePick(){
     note.textContent += '  ·  上次播报(' + hm + '):' +
       (TTS.last.ok ? '✓ 出声了' : '✗ 没出声 —— ' + TTS.last.why);
   }
+  ttsSum();
+  /* 出问题(没装语音 / 上次没出声)时自动展开,让人看得到那行原因 */
+  if (/⚠|✗/.test(note.textContent) && $('#ttsMore')) $('#ttsMore').open = true;
+}
+/* 折起来时那一行显示的当前设置,例如「自动 · 自动女声 · 80%」 */
+function ttsSum(){
+  var el = $('#ttsSum'); if (!el) return;
+  var lang = { auto:'自动', th:'ไทย', zh:'中文' }[TTS.lang] || '自动';
+  var sel = $('#ttsVoice'), voice = '自动女声';
+  if (sel && sel.value && sel.selectedIndex >= 0) voice = sel.options[sel.selectedIndex].text.replace(/\s*[\[(].*$/, '');
+  el.textContent = lang + ' · ' + voice + ' · ' + Math.round(TTS.rate * 100) + '%';
 }
 
 /* ---------- 显示比例(接投影/大电视时调) ---------- */
@@ -3476,7 +3515,7 @@ $('#ttsVoice').onchange = function(){
 $('#ttsRate').oninput = function(){
   TTS.rate = +this.value / 100;
   $('#ttsRateVal').textContent = this.value + '%';
-  ttsSave();
+  ttsSave(); ttsSum();
 };
 $('#bTtsTest').onclick = function(){
   if (!('speechSynthesis' in window)){ toast('เบราว์เซอร์นี้ไม่รองรับ · 这个浏览器不支持语音'); return; }
@@ -3660,6 +3699,7 @@ renderVersion();
   $('#ttsLang').value = TTS.lang;
   $('#ttsRate').value = Math.round(TTS.rate * 100);
   $('#ttsRateVal').textContent = Math.round(TTS.rate * 100) + '%';
+  ttsSum();
   /* 语音列表是异步加载的,第一次拿到的常常是空的 */
   if ('speechSynthesis' in window){
     loadVoices();
