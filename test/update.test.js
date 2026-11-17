@@ -89,6 +89,10 @@ module.exports = async function run({ url, fixtures }) {
 
     const ver = await peek(page, () => document.querySelector('#verNote').textContent, '');
     R.check('设置里的版本行显示缓存已是最新', /已是最新/.test(ver), ver.trim());
+    const tag = await peek(page, () => ({ t: document.querySelector('#verTag').textContent,
+      v: APP_VERSION, old: document.querySelector('#verTag').classList.contains('old') }), {});
+    R.check('版本号就是设置标题旁边一个小标签(不再单独占一块),最新时不带 ⚠',
+            tag.t === tag.v && !tag.old, JSON.stringify(tag));
     /* 设置里不放「应用」「进度存档」两块(用户要求),管理密码下面也不放大段说明 */
     const plain = await peek(page, () => {
       const shown = id => { const e = document.getElementById(id); return !!(e && e.checkVisibility && e.checkVisibility({ checkVisibilityCSS: true })); };

@@ -497,6 +497,10 @@ input,select{font:inherit;color:inherit}
 }
 .panel-h h2{font-size:22px;font-weight:500;margin-right:auto}
 .panel-h h2 em{font-style:normal;font-size:15px;color:var(--ash);margin-left:9px;font-family:var(--f-cn)}
+/* 设置标题旁边的小版本号(原来单独占一块) */
+.ver-tag{font-family:var(--f-util);font-size:13px;color:var(--ash);margin-left:10px;letter-spacing:.04em;
+  padding:2px 8px;border:1px solid var(--line);border-radius:10px;vertical-align:middle}
+.ver-tag.old{color:var(--pour);border-color:var(--pour)}
 .panel-b{padding:22px}
 .sec{
   background:var(--shell-2);border:1px solid var(--line);border-radius:5px;padding:16px 18px 20px;
@@ -708,6 +712,18 @@ td input{padding:9px 10px;font-size:15px}
   .sec{padding:14px 14px 16px}
   .act{flex:1 1 0;min-width:0;font-size:15px;padding:12px 8px}
   .drop{padding:18px 12px}
+  /* 奖项表:去掉上下箭头后把地方让给输入框,名字不再被截成「ราง:」 */
+  #vTiers table{table-layout:fixed}
+  #vTiers th,#vTiers td{padding-left:3px;padding-right:3px}
+  #vTiers th{letter-spacing:.02em;font-size:11.5px}
+  #vTiers th:nth-child(1){width:42px}
+  #vTiers th:nth-child(2){width:auto}
+  #vTiers th:nth-child(3){width:21%}
+  #vTiers th:nth-child(4),#vTiers th:nth-child(5){width:15%}
+  #vTiers th:nth-child(6){width:28px}
+  #vTiers td input{padding:9px 6px}
+  #vTiers .ord{font-size:12.5px;white-space:nowrap}
+  #vTiers .del{padding:5px 4px}
   .plist{grid-template-columns:repeat(2,minmax(0,1fr));max-height:46svh}
   .prow{padding-left:8px;gap:0;font-size:14.5px}
   .pbtn{width:27px;height:30px;font-size:15px}
@@ -915,9 +931,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <button class="ghost" id="bAddTier">+ เพิ่มรางวัล 添加奖项</button>
         <button class="solid" id="bSaveTiers" style="margin-left:auto">บันทึก 保存</button>
       </div>
-      <p class="hint"><b style="color:var(--pour)">抽奖按上到下的顺序依次进行</b> —— 第一行先抽,最后一行压轴。用 ↑ ↓ 调整顺序,越靠后的奖项转动时气氛越紧张。<br>
-      「每轮」= 一次按下停止,同时开出几个人。名额 10、每轮 5,就是抽两轮开完。<br>
-      前面的奖项没抽完,后面的会锁住点不动。改动会清空已抽结果,请在开抽前设置好。</p>
+      <p class="hint">从上往下抽,最后一行压轴。每轮 = 一次抽几人。</p>
     </div>
   </div>
 </div>
@@ -935,10 +949,11 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 <!-- ===== setup ===== -->
 <div class="veil" id="vSetup">
   <div class="panel">
-    <div class="panel-h"><h2>ตั้งค่า <em class="cn">设置</em></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
+    <div class="panel-h"><h2>ตั้งค่า <em class="cn">设置</em><small class="ver-tag" id="verTag"></small></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
     <div class="panel-b">
 
-      <div class="sec">
+      <!-- 版本号放到设置标题旁边了(#verTag);这一块不显示,#verNote 留着给更新逻辑写完整说明 -->
+      <div class="sec" hidden>
         <div class="sec-h">เวอร์ชัน · 版本</div>
         <p class="hint" style="margin-top:0" id="verNote">…</p>
       </div>
@@ -1086,11 +1101,19 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v57';
+var APP_VERSION = 'v59';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
 function renderVersion(){
+  /* 标题旁的小标签只写版本号;离线缓存不是最新时变橙色并加 ⚠,点开 / 悬停能看到完整说明 */
+  var tag = $('#verTag');
+  if (tag){
+    var stale = swVersion !== null && swVersion !== APP_VERSION;
+    tag.textContent = APP_VERSION + (stale ? ' ⚠' : '');
+    tag.classList.toggle('old', stale);
+    tag.title = stale ? '离线缓存还是 ' + swVersion + ',关掉 App 重新打开就会更新' : APP_DATE;
+  }
   var n = $('#verNote'); if (!n) return;
   var line = '版本 ' + APP_VERSION + ' · ' + APP_DATE;
   if (swVersion === null)      line += '  ·  离线缓存:未启用或检查中';
@@ -2289,19 +2312,10 @@ function renderTierRows(){
     tr.appendChild(cell('number', t.quota, 'quota', 1));
     tr.appendChild(cell('number', t.per, 'per', 1));
     var td = el('td','ops');
-    var up = el('button','del','↑'); up.title = '往前(先抽)';
-    up.onclick = function(){
-      var i = S.tiers.indexOf(t); if (i <= 0) return;
-      S.tiers.splice(i, 1); S.tiers.splice(i - 1, 0, t); renderTierRows();
-    };
-    var dn = el('button','del','↓'); dn.title = '往后(后抽)';
-    dn.onclick = function(){
-      var i = S.tiers.indexOf(t); if (i < 0 || i >= S.tiers.length - 1) return;
-      S.tiers.splice(i, 1); S.tiers.splice(i + 1, 0, t); renderTierRows();
-    };
+    /* 只留删除。上下移动的箭头用户觉得没意义,去掉了 —— 顺序就是添加的顺序 */
     var d = el('button','del','×'); d.title = '删除';
     d.onclick = function(){ S.tiers = S.tiers.filter(function(x){ return x !== t; }); renderTierRows(); };
-    td.appendChild(up); td.appendChild(dn); td.appendChild(d);
+    td.appendChild(d);
     tr.appendChild(td);
     tb.appendChild(tr);
   });
@@ -3325,6 +3339,10 @@ $('#bAddTier').onclick = function(){
 };
 $('#bSaveTiers').onclick = function(){
   if (!S.tiers.length){ toast('ต้องมีอย่างน้อย 1 รางวัล · 至少保留一个奖项'); return; }
+  /* 面板里不再写「改动会清空已抽结果」那段说明了,所以真的有结果时当场问一句 */
+  if (S.winners.length && !confirm(
+    'บันทึกแล้วผลที่จับไปจะถูกล้าง  保存后已抽出的结果会清空\n\n' +
+    '已经抽出 ' + S.winners.length + ' 人,保存后他们回到待抽池,从头开始。确定?')) return;
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   syncActive();

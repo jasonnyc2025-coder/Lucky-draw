@@ -428,6 +428,37 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await page.setViewportSize({ width: 1280, height: 860 });
     await page.waitForTimeout(300);
 
+    // ---------- 奖项设置:只留删除;有结果时保存要先确认 ----------
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      let reply = false, asked = '';
+      pg.on('dialog', d => { if (d.type() === 'confirm'){ asked = d.message(); reply ? d.accept() : d.dismiss(); } else d.accept(); });
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(800);
+      await pg.evaluate(() => {
+        S.pool = ['A', 'B', 'C', 'D', 'E', 'F'].map(n => ({ name: n, sub: '' }));
+        S.tiers = [{ id: 'a', th: 'รางวัลที่ 3', zh: '三等奖', quota: 2, per: 2 },
+                   { id: 'b', th: 'รางวัลที่ 1', zh: '一等奖', quota: 1, per: 1 }];
+        S.winners = [{ name: 'Z', sub: '', tierId: 'a' }]; S.history = [];
+        syncActive(); renderRail(); resetStage(); updateControls();
+      });
+      await menu(pg, '#bTiers'); await pg.waitForTimeout(250);
+      const ops = await pg.evaluate(() => [...document.querySelectorAll('#tierRows .ops button')].map(b => b.textContent));
+      R.check('奖项设置每行只剩删除(×),没有上下箭头',
+              ops.length === 2 && ops.every(t => t === '×'), JSON.stringify(ops));
+      const fit = await pg.evaluate(() => [...document.querySelectorAll('#tierRows input')].every(i => i.scrollWidth <= i.clientWidth + 1));
+      R.check('手机上奖项名字、名额都完整显示,不被截断', fit);
+      await pg.click('#bSaveTiers'); await pg.waitForTimeout(250);
+      R.check('已经有中奖结果时点保存,先问一句(取消就不清空)',
+              /结果会清空/.test(asked) && await pg.evaluate(() => S.winners.length) === 1, asked.slice(0, 40));
+      reply = true;
+      await pg.click('#bSaveTiers'); await pg.waitForTimeout(250);
+      R.check('确定后才清空、回到待抽池', await pg.evaluate(() => S.winners.length) === 0);
+      await c.close();
+    }
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();
