@@ -34,6 +34,12 @@ module.exports = async function run({ url }) {
     await page.click('#bSetup'); await page.waitForTimeout(200);
     R.check('设置里有「管理密码」这一块,说明目前没设',
             /没有设密码/.test(await page.textContent('#lockState')));
+    const order = await page.evaluate(() => {
+      const vis = [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden).map(e => e.id || e.querySelector('.sec-h').textContent.trim());
+      return vis.slice(0, 2);
+    });
+    R.check('设置里第一块是「公司 Logo」,紧接着是「管理密码」',
+            order[0] === 'logoSec' && order[1] === 'lockSec', JSON.stringify(order));
     await page.fill('#pwNew', '12'); await page.fill('#pwNew2', '12');
     await page.click('#bPwSet'); await page.waitForTimeout(200);
     R.check('密码少于 4 位不收',

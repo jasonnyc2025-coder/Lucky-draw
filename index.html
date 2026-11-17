@@ -958,6 +958,21 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <p class="hint" style="margin-top:0" id="verNote">…</p>
       </div>
 
+      <div class="sec" id="logoSec">
+        <div class="sec-h">โลโก้บริษัท · 公司 Logo</div>
+        <div class="row">
+          <label class="filepick">เลือกรูป 上传 / 更换 Logo<input type="file" id="logoFile" accept="image/*" hidden></label>
+          <button class="ghost" id="bClearLogo">ลบ 清除</button>
+          <img class="logo-prev" id="logoPrev" alt="">
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label class="fld"><span>ชื่อบริษัท · 公司名称(主)</span>
+            <input type="text" id="orgMain" maxlength="60" placeholder="บริษัท ตัวอย่าง จำกัด"></label>
+          <label class="fld"><span>บรรทัดที่สอง · 第二行(可留空)</span>
+            <input type="text" id="orgSub" maxlength="60" placeholder="示例公司"></label>
+        </div>
+      </div>
+
       <div class="sec" id="lockSec">
         <div class="sec-h">รหัสผ่านผู้ดูแล · 管理密码</div>
         <p class="hint" style="margin:0 0 12px" id="lockState">…</p>
@@ -1064,21 +1079,6 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <div class="sec">
-        <div class="sec-h">โลโก้บริษัท · 公司 Logo</div>
-        <div class="row">
-          <label class="filepick">เลือกรูป 上传 / 更换 Logo<input type="file" id="logoFile" accept="image/*" hidden></label>
-          <button class="ghost" id="bClearLogo">ลบ 清除</button>
-          <img class="logo-prev" id="logoPrev" alt="">
-        </div>
-        <div class="row" style="margin-top:14px">
-          <label class="fld"><span>ชื่อบริษัท · 公司名称(主)</span>
-            <input type="text" id="orgMain" maxlength="60" placeholder="บริษัท ตัวอย่าง จำกัด"></label>
-          <label class="fld"><span>บรรทัดที่สอง · 第二行(可留空)</span>
-            <input type="text" id="orgSub" maxlength="60" placeholder="示例公司"></label>
-        </div>
-      </div>
-
-      <div class="sec">
         <div class="sec-h">เสียง · 音效</div>
         <div class="row">
           <label class="chk"><input type="checkbox" id="sndOn" checked> เปิดเสียง · 开启音效</label>
@@ -1101,7 +1101,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v59';
+var APP_VERSION = 'v60';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
