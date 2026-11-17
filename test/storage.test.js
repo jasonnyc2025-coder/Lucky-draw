@@ -105,31 +105,29 @@ module.exports = async function run({ url, staffXlsx }) {
     await drawOnce(2);
     R.check('恢复后能接着抽完这一档', await page.evaluate(() => S.winners.length) === 4);
 
-    // ---------- 关掉自动保存 ----------
-    await menu(page, '#bSetup');
-    await page.waitForSelector('#vSetup.on');
-    await page.uncheck('#autoSave');
-    await page.waitForTimeout(200);
-    await page.click('#vSetup [data-close]');
-    await drawOnce(1);                                   // 二等奖抽 1 人
-    const offCount = await page.evaluate(() => S.winners.length);
-
+    // ---------- 自动保存一直开着(设置里「本机存档」已不显示) ----------
+    const shown = await page.evaluate(() => {
+      document.querySelector('#vSetup').classList.add('on');
+      const e = document.querySelector('#storeSec');
+      const v = e.checkVisibility ? e.checkVisibility() : !!e.offsetParent;
+      document.querySelector('#vSetup').classList.remove('on');
+      return v;
+    });
+    R.check('设置里不显示「本机存档」那一块', shown === false);
+    /* 以前在这台设备上关过自动保存:开关已经看不到了,所以不能再听那个旧设置 */
+    await page.evaluate(() => localStorage.setItem('lucky-draw.autosave', 'off'));
     await reopen();
-    const afterOff = await page.evaluate(() => ({
-      w: S.winners.length, autoSave: document.querySelector('#autoSave').checked,
-    }));
-    R.check('关掉自动保存后新结果不再写入', afterOff.w === 4 && offCount === 5,
-            '关前=' + offCount + ' 重开=' + afterOff.w);
-    R.check('开关状态本身也记住了', afterOff.autoSave === false);
-
-    await menu(page, '#bSetup');
-    await page.waitForSelector('#vSetup.on');
-    await page.check('#autoSave');
-    await page.waitForTimeout(600);
+    await drawOnce(1);                                   // 二等奖抽 1 人
+    const onCount = await page.evaluate(() => S.winners.length);
+    await page.waitForTimeout(800);
+    await reopen();
+    const afterOld = await page.evaluate(() => S.winners.length);
+    R.check('就算以前关过自动保存,现在也照样自动保存(重开后结果还在)',
+            onCount === 5 && afterOld === 5, '抽完=' + onCount + ' 重开=' + afterOld);
 
     // ---------- 清除本机数据 ----------
     page.on('dialog', d => d.accept());
-    await page.click('#bClearStore');
+    await page.$eval('#bClearStore', b => b.click());   /* 按钮已不显示,功能保留 */
     await page.waitForTimeout(800);
     const cleared = await page.evaluate(() => ({
       pool: S.pool.length, winners: S.winners.length, logo: S.logo, tiers: S.tiers.length,

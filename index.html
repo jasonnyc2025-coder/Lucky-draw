@@ -163,19 +163,21 @@ input,select{font:inherit;color:inherit}
 .mapcard .bname{--bfs:30px;display:inline-block}
 .mapcard .bname b{display:block;font-size:26px}
 .mapcard .bname span{display:block;font-size:14px;color:var(--ash);margin-top:3px}
-.themes{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.themes{display:grid;gap:8px;grid-template-columns:repeat(3,minmax(0,1fr))}
+/* 三套并排成一行小卡片(原来手机上竖着叠三张大卡,占半屏):色点 + 名字,泰文一行、中文一行 */
 .theme{
-  display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;
-  padding:13px 14px;border:1px solid var(--line);border-radius:4px;
-  background:var(--slag);transition:.16s;
+  display:flex;flex-direction:column;gap:5px;align-items:center;text-align:center;
+  padding:9px 6px;border:1px solid var(--line);border-radius:4px;
+  background:var(--slag);transition:.16s;min-width:0;
 }
-.theme b{font-family:var(--f-util);font-size:15px;font-weight:600;color:var(--bone)}
+.theme b{font-family:var(--f-util);font-size:13.5px;font-weight:600;color:var(--bone);line-height:1.3}
+.theme b span{display:block;font-family:var(--f-cn);font-size:12.5px;font-weight:500}
 .theme em{font-style:normal;font-size:12.5px;color:var(--ash)}
-.theme .sw{display:flex;gap:4px;margin-bottom:5px}
-.theme .sw i{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+.theme .sw{display:flex;gap:3px}
+.theme .sw i{width:13px;height:13px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
 .theme:hover{border-color:var(--ash)}
 .theme.on{border-color:var(--pour);box-shadow:inset 0 0 0 1px var(--pour)}
-.theme.on b::after{content:' ✓';color:var(--pour)}
+.theme.on b span::after{content:' ✓';color:var(--pour)}
 /* 左上角没有 Logo 时,那里是一个可以直接点的上传位。
    尺寸必须和 Logo 本身(38px 高)一样 —— 做大一点点顶栏就会多折一行,
    舞台矮 48px,结束总榜的字号会被挤小一档。 */
@@ -978,7 +980,8 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         </div>
       </div>
 
-      <div class="sec">
+      <!-- 「本机存档」:用户要求不显示。自动保存一直开着(见 autoOn),清除功能代码保留 -->
+      <div class="sec" id="storeSec" hidden>
         <div class="sec-h">ข้อมูลในเครื่อง · 本机存档</div>
         <div class="row">
           <label class="chk"><input type="checkbox" id="autoSave" checked> บันทึกอัตโนมัติ · 自动保存到本机</label>
@@ -1029,20 +1032,19 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <div class="themes" id="themes">
           <button class="theme" data-t="forge">
             <span class="sw"><i style="background:#221C19"></i><i style="background:#FF8A1F"></i><i style="background:#EFE8E0"></i></span>
-            <b>เตาหลอม 暖炭</b><em>默认 · 稳重</em>
+            <b>เตาหลอม<span>暖炭</span></b>
           </button>
           <button class="theme" data-t="gala">
             <span class="sw"><i style="background:#2B0F10"></i><i style="background:#F3C44C"></i><i style="background:#FFF4E3"></i></span>
-            <b>งานเลี้ยง 年会红金</b><em>喜庆 · 对比最高</em>
+            <b>งานเลี้ยง<span>年会红金</span></b>
           </button>
           <button class="theme" data-t="ink">
             <span class="sw"><i style="background:#1C212A"></i><i style="background:#6FBBFF"></i><i style="background:#E9EEF4"></i></span>
-            <b>หมึก 墨蓝</b><em>冷静 · 商务</em>
+            <b>หมึก<span>墨蓝</span></b>
           </button>
         </div>
-        <div class="row" style="margin-bottom:14px">
+        <div class="row" style="margin-top:12px">
           <label class="chk"><input type="checkbox" id="fwOn" checked> ดอกไม้ไฟตอนจบ · 抽完放烟花</label>
-          <span class="hint" style="margin:0">全部抽完、总榜出来时放。名字永远压在烟花上面,不会被挡住。</span>
         </div>
       </div>
 
@@ -1084,7 +1086,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v56';
+var APP_VERSION = 'v57';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -3014,8 +3016,10 @@ var DB = (function(){
   };
 })();
 
+/* 自动保存一直开着。设置里「本机存档」那一块已经不显示(用户要求),
+   以前在某台设备上关掉过的,开关看不到就再也打不开了 —— 所以不再读那个旧设置。
+   现场误关页面、断电、手机杀后台,重新打开都能接着抽。 */
 var autoOn = true, saveTimer = null, restoring = false;
-try { autoOn = localStorage.getItem(STORE_PREF) !== 'off'; } catch(e){}
 
 function two(n){ return String(n).padStart(2, '0'); }
 function storeNote(txt){ var n = $('#storeNote'); if (n) n.textContent = txt; }
