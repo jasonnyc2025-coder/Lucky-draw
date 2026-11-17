@@ -931,7 +931,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <button class="ghost" id="bAddTier">+ เพิ่มรางวัล 添加奖项</button>
         <button class="solid" id="bSaveTiers" style="margin-left:auto">บันทึก 保存</button>
       </div>
-      <p class="hint">从上往下抽,最后一行压轴。每轮 = 一次抽几人。</p>
+      <p class="hint">小奖先抽,特等奖最后。每轮 = 一次抽几人。</p>
     </div>
   </div>
 </div>
@@ -1101,7 +1101,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v61';
+var APP_VERSION = 'v62';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2319,9 +2319,42 @@ function tierLabelHTML(t){
   if (t.zh) a.push('<span class="cn">' + esc(t.zh) + '</span>');
   return a.join(' &nbsp;·&nbsp; ');
 }
+/* ---------- 奖项等级 ----------
+   特等奖 = 0,一等奖 = 1,二等奖 = 2 …… 数字越大奖越小。
+   抽奖从最小的奖开始,特等奖最后(压轴)。S.tiers 里存的就是抽奖顺序。 */
+var CN_DIGIT = '零一二三四五六七八九';
+function cnNum(n){
+  if (n < 10) return CN_DIGIT[n];
+  if (n < 20) return '十' + (n % 10 ? CN_DIGIT[n % 10] : '');
+  return CN_DIGIT[Math.floor(n / 10)] + '十' + (n % 10 ? CN_DIGIT[n % 10] : '');
+}
+function prizeLevel(t){
+  var zh = String(t.zh || ''), th = String(t.th || ''), m;
+  if (/特等/.test(zh) || /รางวัล(ใหญ่|พิเศษ)/.test(th)) return 0;
+  if ((m = zh.match(/(\d+)\s*等奖/))) return +m[1];
+  if ((m = zh.match(/([一二三四五六七八九十]+)等奖/))){
+    for (var n = 1; n < 100; n++) if (cnNum(n) === m[1]) return n;
+  }
+  if ((m = th.match(/รางวัลที่\s*(\d+)/))) return +m[1];
+  return null;
+}
+function levelName(n){
+  return n === 0 ? { th:'รางวัลใหญ่', zh:'特等奖' } : { th:'รางวัลที่ ' + n, zh: cnNum(n) + '等奖' };
+}
+/* 按等级排好抽奖顺序:小奖先抽,特等奖最后。有认不出等级的名字(自己起的)就不动顺序 */
+function sortTiersByLevel(){
+  var lv = S.tiers.map(prizeLevel);
+  if (lv.some(function(x){ return x === null; })) return;
+  var idx = S.tiers.map(function(t, i){ return { t:t, l:lv[i], i:i }; });
+  idx.sort(function(a, b){ return (b.l - a.l) || (a.i - b.i); });
+  S.tiers = idx.map(function(x){ return x.t; });
+}
 function renderTierRows(){
   var tb = $('#tierRows'); tb.innerHTML = '';
-  S.tiers.forEach(function(t, idx){
+  /* 表里按奖的大小排:特等奖在最上面(也就是添加的顺序);抽奖从最下面一行开始往上抽。
+     序号写的是「第几个抽」,所以最上面那行的数字最大,标「压轴」。 */
+  S.tiers.slice().reverse().forEach(function(t){
+    var idx = S.tiers.indexOf(t);
     var tr = el('tr');
     var ord = el('td','ord', String(idx + 1));
     if (idx === S.tiers.length - 1) ord.appendChild(el('small', 'ord-top', '压轴'));   // 压轴单独一小行,手机上不挤进名字框
@@ -3362,8 +3395,13 @@ $('#bClearSearch').onclick = function(){
 $('#bAddPerson').onclick = addPerson;
 $('#bClearPool').onclick = clearRoster;
 
+/* 新奖项自动起名:比现在最小的奖再小一级。空的时候第一个是特等奖,
+   然后一等奖、二等奖、三等奖 …… 小奖先抽,所以放在抽奖顺序的最前面(表里的最下面) */
 $('#bAddTier').onclick = function(){
-  S.tiers.push({id:++uid, th:'รางวัลใหญ่', zh:'特等奖', quota:1, per:1});
+  var known = S.tiers.map(prizeLevel).filter(function(x){ return x !== null; });
+  var n = !S.tiers.length ? 0 : (known.length ? Math.max.apply(null, known) + 1 : S.tiers.length);
+  var nm = levelName(n);
+  S.tiers.unshift({id:++uid, th:nm.th, zh:nm.zh, quota:1, per:1});
   renderTierRows();
 };
 $('#bSaveTiers').onclick = function(){
@@ -3374,6 +3412,7 @@ $('#bSaveTiers').onclick = function(){
     '已经抽出 ' + S.winners.length + ' 人,保存后他们回到待抽池,从头开始。确定?')) return;
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
+  sortTiersByLevel();            // 改过名字也照样:小奖先抽,特等奖最后
   syncActive();
   renderRail(); resetStage(); autosave();
   $('#vTiers').classList.remove('on');

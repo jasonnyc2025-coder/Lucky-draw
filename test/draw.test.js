@@ -90,7 +90,8 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await menu(page, '#bTiers');
     await page.waitForSelector('#vTiers.on');
     const tierCount = await page.evaluate(() => S.tiers.length);
-    for (const [row, quota, per] of [[1, 10, 5], [2, 3, 3], [3, 1, 1]]) {
+    /* 表里最上面是最大的奖(一等奖),最下面是先抽的三等奖 */
+    for (const [row, quota, per] of [[3, 10, 5], [2, 3, 3], [1, 1, 1]]) {
       const ins = await page.$$('#tierRows tr:nth-child(' + row + ') input');
       await ins[1].fill(String(quota));      // 名字合成一个框了:0 名字 / 1 名额 / 2 每轮
       await ins[2].fill(String(per));
@@ -455,15 +456,16 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
         const first = document.querySelector('#tierRows tr input');
         const shown = first.value;
         first.value = 'รางวัลพิเศษ 特别奖'; first.dispatchEvent(new Event('input'));
-        const a = { th: S.tiers[0].th, zh: S.tiers[0].zh };
+        const top = () => S.tiers[S.tiers.length - 1];     // 表里第一行 = 最大的奖 = 最后抽
+        const a = { th: top().th, zh: top().zh };
         first.value = '一等奖 รางวัลที่ 1'; first.dispatchEvent(new Event('input'));
-        const b = { th: S.tiers[0].th, zh: S.tiers[0].zh };
+        const b = { th: top().th, zh: top().zh };
         first.value = 'รางวัลใหญ่'; first.dispatchEvent(new Event('input'));
-        const c = { th: S.tiers[0].th, zh: S.tiers[0].zh, label: tierLabel(S.tiers[0]) };
+        const c = { th: top().th, zh: top().zh, label: tierLabel(top()) };
         return { heads, shown, a, b, c };
       });
       R.check('泰文名、中文名合在一个框里(表头只有一列名字)',
-              merged.heads.filter(h => /ชื่อรางวัล|名称/.test(h)).length === 1 && merged.shown === 'รางวัลที่ 3 三等奖',
+              merged.heads.filter(h => /ชื่อรางวัล|名称/.test(h)).length === 1 && merged.shown === 'รางวัลที่ 1 一等奖',
               JSON.stringify(merged.heads) + ' ' + merged.shown);
       R.check('一个框里的名字按文字自动拆成泰文 / 中文(中文写在前面也认)',
               merged.a.th === 'รางวัลพิเศษ' && merged.a.zh === '特别奖' &&
@@ -476,6 +478,44 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       reply = true;
       await pg.click('#bSaveTiers'); await pg.waitForTimeout(250);
       R.check('确定后才清空、回到待抽池', await pg.evaluate(() => S.winners.length) === 0);
+
+      /* 添加奖项:按 特等奖 → 一等奖 → 二等奖 …… 自动起名;抽的时候小奖先抽、特等奖最后 */
+      await menu(pg, '#bTiers'); await pg.waitForTimeout(250);
+      const added = await pg.evaluate(() => {
+        S.tiers = []; renderTierRows();
+        for (let i = 0; i < 4; i++) document.querySelector('#bAddTier').click();
+        return {
+          rows: [...document.querySelectorAll('#tierRows tr input[type=text]')].map(i => i.value),
+          draw: S.tiers.map(t => t.zh),
+          ord: [...document.querySelectorAll('#tierRows .ord')].map(o => o.textContent),
+        };
+      });
+      R.check('空列表连点 4 次「添加奖项」:特等奖、一等奖、二等奖、三等奖(表里从上到下)',
+              JSON.stringify(added.rows) === JSON.stringify(['รางวัลใหญ่ 特等奖', 'รางวัลที่ 1 一等奖', 'รางวัลที่ 2 二等奖', 'รางวัลที่ 3 三等奖']),
+              JSON.stringify(added.rows));
+      R.check('抽奖顺序:三等奖先抽,特等奖最后(压轴)',
+              JSON.stringify(added.draw) === JSON.stringify(['三等奖', '二等奖', '一等奖', '特等奖']) && /压轴/.test(added.ord[0]),
+              JSON.stringify(added));
+      const more = await pg.evaluate(() => {
+        S.tiers = [{ id: 'x3', th: 'รางวัลที่ 3', zh: '三等奖', quota: 1, per: 1 },
+                   { id: 'x2', th: 'รางวัลที่ 2', zh: '二等奖', quota: 1, per: 1 },
+                   { id: 'x1', th: 'รางวัลที่ 1', zh: '一等奖', quota: 1, per: 1 }];
+        renderTierRows();
+        document.querySelector('#bAddTier').click();
+        return S.tiers[0].zh;
+      });
+      R.check('已有 一、二、三等奖时再加一个:自动是四等奖,而且最先抽', more === '四等奖', more);
+      reply = true;
+      const sorted = await pg.evaluate(() => {
+        /* 把最下面那行(四等奖)改名成特等奖,保存后应该排到最后抽 */
+        const boxes = [...document.querySelectorAll('#tierRows tr input[type=text]')];
+        const bottom = boxes[boxes.length - 1];
+        bottom.value = 'รางวัลใหญ่ 特等奖'; bottom.dispatchEvent(new Event('input'));
+        document.querySelector('#bSaveTiers').click();
+        return S.tiers.map(t => t.zh);
+      });
+      R.check('改了名字再保存,顺序会按奖的大小重排(特等奖还是最后抽)',
+              sorted[sorted.length - 1] === '特等奖' && sorted[0] === '三等奖', JSON.stringify(sorted));
       await c.close();
     }
 

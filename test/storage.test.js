@@ -63,7 +63,7 @@ module.exports = async function run({ url, staffXlsx }) {
 
     await menu(page, '#bTiers');
     await page.waitForSelector('#vTiers.on');
-    const ins = await page.$$('#tierRows tr:nth-child(1) input');
+    const ins = await page.$$('#tierRows tr:last-child input');   // 最下面一行 = 先抽的那档 = S.tiers[0]
     await ins[1].fill('4');
     await ins[2].fill('2');
     await page.click('#bSaveTiers');
