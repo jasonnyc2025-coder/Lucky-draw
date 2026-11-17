@@ -19,6 +19,7 @@ const SUITES = {
   finale: require('./finale.test.js'),
   bigscreen: require('./bigscreen.test.js'),
   speak: require('./speak.test.js'),
+  lock: require('./lock.test.js'),
 };
 
 (async () => {

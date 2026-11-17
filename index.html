@@ -460,6 +460,13 @@ input,select{font:inherit;color:inherit}
 .app.clean.peek .topbar,
 .app.clean.peek .controls{transform:none;opacity:1;pointer-events:auto}
 
+/* 输密码的小框 */
+.panel.pw{max-width:440px}
+.pw-in{font-size:22px!important;letter-spacing:.2em;text-align:center}
+.pw-err{color:#F08E7E!important;min-height:1.7em;margin-top:8px!important}
+.pw-shake{animation:pwShake .32s}
+@keyframes pwShake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
 /* ---------- drawer / modal ---------- */
 .veil{
   position:fixed;inset:0;z-index:50;background:rgba(16,12,10,.9);
@@ -545,7 +552,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--pour)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 label.fld{display:flex;flex-direction:column;gap:6px;flex:1;min-width:150px}
 label.fld span{font-family:var(--f-util);font-size:12px;letter-spacing:.14em;color:var(--ash)}
-input[type=text],input[type=number],select{
+input[type=text],input[type=number],input[type=password],select{
   background:var(--slag);border:1px solid var(--line);border-radius:3px;padding:11px 12px;font-size:16px;width:100%;
 }
 select{cursor:pointer}
@@ -728,6 +735,19 @@ td input{padding:9px 10px;font-size:15px}
   </div>
 </div>
 
+<!-- ===== password ===== -->
+<div class="veil" id="vLock">
+  <div class="panel pw">
+    <div class="panel-h"><h2>ใส่รหัสผ่าน <em class="cn">请输入密码</em></h2><button class="tbtn" data-close>ยกเลิก 取消</button></div>
+    <div class="panel-b">
+      <input type="password" class="pw-in" id="lockPw" autocomplete="current-password" placeholder="รหัสผ่าน · 密码">
+      <p class="hint pw-err" id="lockErr"></p>
+      <button class="solid" id="lockOk" style="width:100%;margin-top:4px">ปลดล็อก 解锁</button>
+      <p class="hint">这一步需要管理员密码。输对一次后,到关掉 App 前都不用再输。</p>
+    </div>
+  </div>
+</div>
+
 <!-- ===== names ===== -->
 <div class="veil" id="vNames">
   <div class="panel">
@@ -843,6 +863,27 @@ td input{padding:9px 10px;font-size:15px}
       <div class="sec">
         <div class="sec-h">เวอร์ชัน · 版本</div>
         <p class="hint" style="margin-top:0" id="verNote">…</p>
+      </div>
+
+      <div class="sec" id="lockSec">
+        <div class="sec-h">รหัสผ่านผู้ดูแล · 管理密码</div>
+        <p class="hint" style="margin:0 0 12px" id="lockState">…</p>
+        <div class="row">
+          <label class="fld"><span>รหัสใหม่ · 新密码</span><input type="password" id="pwNew" autocomplete="new-password" placeholder="至少 4 位"></label>
+          <label class="fld"><span>ยืนยันรหัส · 再输一次</span><input type="password" id="pwNew2" autocomplete="new-password"></label>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="solid" id="bPwSet">ตั้งรหัส 设置密码</button>
+          <button class="ghost" id="bLockNow">🔒 ล็อกเลย 立即上锁</button>
+          <button class="ghost" id="bPwOff" style="margin-left:auto">ยกเลิกรหัส 取消密码</button>
+        </div>
+        <p class="hint" id="pwNote"></p>
+        <p class="hint">设了密码以后,打开<b>「名单」「奖项设置」「设置」</b>、点<b>「撤销上一轮」「重置」</b>、换 Logo,都要先输密码。
+        「中奖」名单和开始抽奖不用密码。<br>
+        输对一次后,到<b style="color:var(--pour)">关掉 App(或刷新)</b>、或点「立即上锁」之前都不用再输。<br>
+        密码只存在这台设备上(存的是加密后的指纹,不是密码本身),不跟着「保存进度」的文件走。<br>
+        <b>忘了密码</b>:在浏览器设置里清除本网站的数据(名单、Logo 也会一起清掉),
+        或在另一台设备上用「保存进度」的 .json 文件恢复。</p>
       </div>
 
       <div class="sec">
@@ -1012,7 +1053,7 @@ td input{padding:9px 10px;font-size:15px}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v50';
+var APP_VERSION = 'v51';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -3053,7 +3094,110 @@ function restoreProgress(f){
 $('#bPour').onclick = function(){ S.rolling ? stopRoll() : startRoll(); };
 /* 撤销和重置都会改动已经开出来的结果,现场手一滑代价很大,都要二次确认。
    确认框里写清楚具体撤掉谁、影响多少人,而不是一句笼统的「确定吗」。 */
-$('#bUndo').onclick = function(){
+/* ---------- 管理密码 ----------
+   纯前端、没有服务器,所以这是一把「挡住现场有人顺手乱点」的锁,不是防黑客的保险柜。
+   存的是 加盐 SHA-256 指纹(localStorage,跟着设备走,不进「保存进度」的文件),不存密码原文。
+   解锁只记在内存里:关掉 App / 刷新 / 点「立即上锁」就重新锁上。 */
+var LOCK_KEY = 'lucky-draw.lock';
+var LOCK = { rec: null, open: false, next: null };
+try { LOCK.rec = JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch(e){ LOCK.rec = null; }
+function lockOn(){ return !!(LOCK.rec && LOCK.rec.hash && LOCK.rec.salt); }
+function hexOf(buf){
+  return [].map.call(new Uint8Array(buf), function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+}
+function hashPw(salt, pw){
+  var data = new TextEncoder().encode(salt + '|' + pw);
+  if (window.crypto && crypto.subtle && crypto.subtle.digest){
+    return crypto.subtle.digest('SHA-256', data).then(hexOf);
+  }
+  /* 非 https 打开时没有 crypto.subtle:退回一个简单的散列,够当「门锁」用 */
+  var h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (var i = 0; i < data.length; i++){
+    h1 = Math.imul(h1 ^ data[i], 16777619) >>> 0;
+    h2 = Math.imul(h2 + data[i], 2246822519) >>> 0;
+  }
+  return Promise.resolve('f' + h1.toString(16) + h2.toString(16));
+}
+/* 需要密码的操作都从这里过:没设密码 / 已解锁就直接做,否则先弹输密码框,输对了再接着做 */
+function guard(fn){
+  if (!lockOn() || LOCK.open){ fn(); return; }
+  LOCK.next = fn;
+  $('#lockPw').value = ''; $('#lockErr').textContent = '';
+  $('#vLock').classList.add('on');
+  setTimeout(function(){ try { $('#lockPw').focus(); } catch(e){} }, 60);
+}
+function lockSubmit(){
+  var pw = $('#lockPw').value;
+  if (!pw){ $('#lockErr').textContent = '请输入密码 · กรุณาใส่รหัส'; return; }
+  hashPw(LOCK.rec.salt, pw).then(function(h){
+    if (h !== LOCK.rec.hash){
+      $('#lockErr').textContent = 'รหัสไม่ถูกต้อง · 密码不对,再试一次';
+      var box = $('#lockPw');
+      box.classList.remove('pw-shake'); void box.offsetWidth; box.classList.add('pw-shake');
+      box.select();
+      return;
+    }
+    LOCK.open = true;
+    $('#vLock').classList.remove('on');
+    var f = LOCK.next; LOCK.next = null;
+    syncLockUI();
+    if (f) f();
+  });
+}
+$('#lockOk').onclick = lockSubmit;
+$('#lockPw').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); lockSubmit(); } });
+/* 换 Logo 要弹系统的选图框,浏览器只认「手指直接点」才肯弹;
+   输完密码再弹会被拦掉,所以解锁后请再点一次 */
+function pickLogo(){
+  if (!lockOn() || LOCK.open){ $('#logoFile').click(); return; }
+  guard(function(){ toast('ปลดล็อกแล้ว · 已解锁,再点一次 Logo 就能换'); });
+}
+function syncLockUI(){
+  var st = $('#lockState'); if (!st) return;
+  if (!lockOn()){
+    st.innerHTML = '目前<b>没有设密码</b>,谁拿到这台设备都能改名单、改奖项、撤销、重置。';
+    $('#bPwSet').textContent = 'ตั้งรหัส 设置密码';
+  } else {
+    st.innerHTML = '<b style="color:var(--pour)">已设密码</b>' +
+      (LOCK.open ? ' · 现在是解锁状态(关掉 App 或点「立即上锁」后重新锁上)' : ' · 已上锁');
+    $('#bPwSet').textContent = 'เปลี่ยนรหัส 修改密码';
+  }
+  $('#bLockNow').style.display = lockOn() ? '' : 'none';
+  $('#bPwOff').style.display = lockOn() ? '' : 'none';
+}
+$('#bPwSet').onclick = function(){
+  var a = $('#pwNew').value, b = $('#pwNew2').value, note = $('#pwNote');
+  if (a.length < 4){ note.textContent = '⚠ 密码至少 4 位 · รหัสอย่างน้อย 4 ตัว'; return; }
+  if (a !== b){ note.textContent = '⚠ 两次输入的不一样 · รหัสสองช่องไม่ตรงกัน'; return; }
+  var salt = hexOf(crypto.getRandomValues(new Uint8Array(16)));
+  hashPw(salt, a).then(function(h){
+    var rec = { salt: salt, hash: h, v: 1 };
+    try { localStorage.setItem(LOCK_KEY, JSON.stringify(rec)); }
+    catch(e){ note.textContent = '⚠ 存不进去(浏览器禁止了本地存储?)'; return; }
+    var was = lockOn();
+    LOCK.rec = rec; LOCK.open = true;
+    $('#pwNew').value = ''; $('#pwNew2').value = '';
+    note.textContent = '';
+    syncLockUI();
+    toast(was ? 'เปลี่ยนรหัสแล้ว · 密码已修改' : 'ตั้งรหัสแล้ว · 密码已设置,关掉 App 后再打开就要输密码');
+  });
+};
+$('#bLockNow').onclick = function(){
+  LOCK.open = false;
+  document.querySelectorAll('.veil.on').forEach(function(v){ v.classList.remove('on'); });
+  toast('ล็อกแล้ว · 已上锁,改名单、奖项、设置都要输密码');
+};
+$('#bPwOff').onclick = function(){
+  if (!confirm('ยกเลิกรหัสผ่าน?  取消密码?\n\n取消后谁都可以改名单、改奖项、撤销、重置。')) return;
+  try { localStorage.removeItem(LOCK_KEY); } catch(e){}
+  LOCK.rec = null; LOCK.open = false;
+  syncLockUI();
+  toast('ยกเลิกรหัสแล้ว · 已取消密码');
+};
+syncLockUI();
+
+$('#bUndo').onclick = function(){ guard(undoAsk); };
+function undoAsk(){
   var last = S.history[S.history.length - 1];
   if (!last) return;
   var t = tierById(last.tierId);
@@ -3066,8 +3210,9 @@ $('#bUndo').onclick = function(){
     '这 ' + last.people.length + ' 位的中奖资格会被取消:\n' + names +
     '\n\n他们会回到待抽池,可以重新抽。')) return;
   undo();
-};
-$('#bReset').onclick = function(){
+}
+$('#bReset').onclick = function(){ guard(resetAsk); };
+function resetAsk(){
   if (!S.winners.length && !S.pool.length) return;
   if (!confirm(
     'รีเซ็ตทั้งหมด?  重置全部?\n\n' +
@@ -3077,13 +3222,13 @@ $('#bReset').onclick = function(){
   S.winners = []; S.history = [];
   syncActive();
   renderRail(); resetStage(); autosave(); toast('รีเซ็ตแล้ว · 已重置');
-};
+}
 $('#bFull').onclick = function(){
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen().catch(function(){});
 };
-$('#bNames').onclick = function(){ renderPoolList(); $('#vNames').classList.add('on'); };
-$('#bTiers').onclick = function(){ renderTierRows(); $('#vTiers').classList.add('on'); };
+$('#bNames').onclick = function(){ guard(function(){ renderPoolList(); $('#vNames').classList.add('on'); }); };
+$('#bTiers').onclick = function(){ guard(function(){ renderTierRows(); $('#vTiers').classList.add('on'); }); };
 $('#bWinners').onclick = function(){ renderWinners(); $('#vWinners').classList.add('on'); };
 document.querySelectorAll('[data-close]').forEach(function(b){
   b.onclick = function(){ b.closest('.veil').classList.remove('on'); };
@@ -3142,7 +3287,7 @@ $('#bSaveTiers').onclick = function(){
 };
 $('#bExport').onclick = exportCSV;
 
-$('#bSetup').onclick = function(){ $('#vSetup').classList.add('on'); };
+$('#bSetup').onclick = function(){ guard(function(){ syncLockUI(); $('#vSetup').classList.add('on'); }); };
 $('#bSaveProg').onclick = saveProgress;
 $('#progFile').onchange = function(e){ restoreProgress(e.target.files[0]); e.target.value = ''; };
 
@@ -3158,11 +3303,11 @@ $('#logoFile').onchange = function(e){
 };
 $('#bClearLogo').onclick = function(){ applyLogo(''); toast('ลบโลโก้แล้ว · Logo 已清除'); };
 /* 左上角那块直接点就能换 —— 换公司时不用先进设置再找 */
-$('#logoImg').onclick = function(){ $('#logoFile').click(); };
-$('#shLogo').onclick = function(){ $('#logoFile').click(); };
+$('#logoImg').onclick = function(){ pickLogo(); };
+$('#shLogo').onclick = function(){ pickLogo(); };
 $('#orgMain').oninput = function(){ applyOrg(true); };
 $('#orgSub').oninput  = function(){ applyOrg(true); };
-$('#logoAdd').onclick = function(){ $('#logoFile').click(); };
+$('#logoAdd').onclick = function(){ pickLogo(); };
 
 $('#ttsOn').onchange = function(){
   TTS.on = this.checked; ttsSave();
