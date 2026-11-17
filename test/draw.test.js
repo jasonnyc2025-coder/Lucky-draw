@@ -92,8 +92,8 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     const tierCount = await page.evaluate(() => S.tiers.length);
     for (const [row, quota, per] of [[1, 10, 5], [2, 3, 3], [3, 1, 1]]) {
       const ins = await page.$$('#tierRows tr:nth-child(' + row + ') input');
-      await ins[2].fill(String(quota));
-      await ins[3].fill(String(per));
+      await ins[1].fill(String(quota));      // 名字合成一个框了:0 名字 / 1 名额 / 2 每轮
+      await ins[2].fill(String(per));
     }
     await page.click('#bSaveTiers');
     await page.waitForTimeout(300);
@@ -450,6 +450,26 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
               ops.length === 2 && ops.every(t => t === '×'), JSON.stringify(ops));
       const fit = await pg.evaluate(() => [...document.querySelectorAll('#tierRows input')].every(i => i.scrollWidth <= i.clientWidth + 1));
       R.check('手机上奖项名字、名额都完整显示,不被截断', fit);
+      const merged = await pg.evaluate(() => {
+        const heads = [...document.querySelectorAll('#vTiers thead th')].map(h => h.textContent.trim());
+        const first = document.querySelector('#tierRows tr input');
+        const shown = first.value;
+        first.value = 'รางวัลพิเศษ 特别奖'; first.dispatchEvent(new Event('input'));
+        const a = { th: S.tiers[0].th, zh: S.tiers[0].zh };
+        first.value = '一等奖 รางวัลที่ 1'; first.dispatchEvent(new Event('input'));
+        const b = { th: S.tiers[0].th, zh: S.tiers[0].zh };
+        first.value = 'รางวัลใหญ่'; first.dispatchEvent(new Event('input'));
+        const c = { th: S.tiers[0].th, zh: S.tiers[0].zh, label: tierLabel(S.tiers[0]) };
+        return { heads, shown, a, b, c };
+      });
+      R.check('泰文名、中文名合在一个框里(表头只有一列名字)',
+              merged.heads.filter(h => /ชื่อรางวัล|名称/.test(h)).length === 1 && merged.shown === 'รางวัลที่ 3 三等奖',
+              JSON.stringify(merged.heads) + ' ' + merged.shown);
+      R.check('一个框里的名字按文字自动拆成泰文 / 中文(中文写在前面也认)',
+              merged.a.th === 'รางวัลพิเศษ' && merged.a.zh === '特别奖' &&
+              merged.b.th === 'รางวัลที่ 1' && merged.b.zh === '一等奖', JSON.stringify([merged.a, merged.b]));
+      R.check('只写泰文也行,显示时不会多出一个孤零零的「·」',
+              merged.c.th === 'รางวัลใหญ่' && merged.c.zh === '' && merged.c.label === 'รางวัลใหญ่', JSON.stringify(merged.c));
       await pg.click('#bSaveTiers'); await pg.waitForTimeout(250);
       R.check('已经有中奖结果时点保存,先问一句(取消就不清空)',
               /结果会清空/.test(asked) && await pg.evaluate(() => S.winners.length) === 1, asked.slice(0, 40));

@@ -598,6 +598,7 @@ th{
 td{padding:5px 8px;border-top:1px solid var(--line)}
 td input{padding:9px 10px;font-size:15px}
 .ord{font-family:var(--f-util);font-size:14px;color:var(--ash);white-space:nowrap}
+.ord-top{display:block;font-size:11.5px;color:var(--pour);margin-top:2px}
 .ops{white-space:nowrap;text-align:right}
 .del{color:#A08D7E;font-size:22px;line-height:1;padding:5px 9px;transition:.16s}
 .del:hover{color:#E2603A}
@@ -716,11 +717,10 @@ td input{padding:9px 10px;font-size:15px}
   #vTiers table{table-layout:fixed}
   #vTiers th,#vTiers td{padding-left:3px;padding-right:3px}
   #vTiers th{letter-spacing:.02em;font-size:11.5px}
-  #vTiers th:nth-child(1){width:42px}
+  #vTiers th:nth-child(1){width:40px}
   #vTiers th:nth-child(2){width:auto}
-  #vTiers th:nth-child(3){width:21%}
-  #vTiers th:nth-child(4),#vTiers th:nth-child(5){width:15%}
-  #vTiers th:nth-child(6){width:28px}
+  #vTiers th:nth-child(3),#vTiers th:nth-child(4){width:19%}
+  #vTiers th:nth-child(5){width:28px}
   #vTiers td input{padding:9px 6px}
   #vTiers .ord{font-size:12.5px;white-space:nowrap}
   #vTiers .del{padding:5px 4px}
@@ -922,8 +922,8 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       <table>
         <thead><tr>
           <th style="width:9%">ลำดับ 顺序</th>
-          <th style="width:26%">ชื่อรางวัล ไทย</th><th style="width:22%">中文名称</th>
-          <th style="width:13%">จำนวน 名额</th><th style="width:14%">ต่อรอบ 每轮</th><th></th>
+          <th style="width:52%">ชื่อรางวัล · 奖项名称</th>
+          <th style="width:15%">จำนวน 名额</th><th style="width:15%">ต่อรอบ 每轮</th><th></th>
         </tr></thead>
         <tbody id="tierRows"></tbody>
       </table>
@@ -1101,7 +1101,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v60';
+var APP_VERSION = 'v61';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1436,7 +1436,7 @@ function renderRail(){
          中途状态变了(恢复进度、改奖项)就会算错。 */
       var now = currentIndex(), head = now >= 0 ? S.tiers[now] : null;
       if (head && tierIndex(t.id) > now){
-        toast('ต้องจับตามลำดับ · 请按顺序,先抽完「' + head.zh + '」');
+        toast('ต้องจับตามลำดับ · 请按顺序,先抽完「' + tierLabel(head) + '」');
         return;
       }
       S.activeTier = t.id; renderRail(); resetStage();
@@ -1656,7 +1656,7 @@ function resetStage(){
   var got = wonIn(t.id);
   var pos = tierIndex(t.id), last = pos === S.tiers.length - 1;
   eyebrow(
-    esc(t.th) + ' &nbsp;·&nbsp; <span class="cn">' + esc(t.zh) + '</span>',
+    tierLabelHTML(t),
     '<span style="opacity:.8">' + (pos + 1) + '/' + S.tiers.length + '</span> &nbsp;·&nbsp; ' +
     'จับแล้ว <b>' + got + '/' + t.quota + '</b>' +
     (last ? ' &nbsp;·&nbsp; <span style="color:var(--pour)">รางวัลสุดท้าย 压轴</span>' : ''));
@@ -1755,7 +1755,7 @@ function renderFinalBoard(){
     var ws = S.winners.filter(function(w){ return w.tierId === t.id; });
     if (!ws.length) return;
     var g = el('div','bgrp' + (i === last ? ' top' : ''));
-    g.appendChild(el('div','bgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน / 人'));
+    g.appendChild(el('div','bgrp-h', tierLabel(t, '  ·  ') + '  ·  ' + ws.length + ' คน / 人'));
     var grid = el('div','bnames');
     ws.forEach(function(w){
       var c = el('div','bname');
@@ -1926,14 +1926,14 @@ function stopRoll(){
   setTimeout(function(){
     var got = wonIn(t.id), full = got >= t.quota;
     var main = 'ยินดีด้วย · <span class="cn">恭喜</span>';
-    var sub  = esc(t.th) + ' &nbsp;·&nbsp; <span class="cn">' + esc(t.zh) + '</span>' +
+    var sub  = tierLabelHTML(t) +
                ' &nbsp;·&nbsp; <b>' + got + '/' + t.quota + '</b>';
     if (full){
       var nx = currentIndex();
       if (nx >= 0){
         S.activeTier = S.tiers[nx].id;
         sub += ' &nbsp;→&nbsp; <span style="color:var(--pour)">ถัดไป ' +
-          esc(S.tiers[nx].th) + ' · <span class="cn">' + esc(S.tiers[nx].zh) + '</span></span>';
+          tierLabelHTML(S.tiers[nx]) + '</span>';
       } else {
         main = 'จบการจับรางวัล · <span class="cn">全部抽奖完成</span>';
         sub = '';
@@ -2294,11 +2294,37 @@ function handleFile(f){
 }
 
 /* ---------- tiers editor ---------- */
+/* 「รางวัลที่ 3 三等奖」→ {th:'รางวัลที่ 3', zh:'三等奖'}。
+   泰文名念给泰语声音、中文名念给中文声音,舞台标题也分开排,所以存的时候还是两个字段。
+   中文写在前面(「一等奖 รางวัลที่ 1」)也认。只写一种也行,另一种留空。 */
+function splitTierName(str){
+  var s = String(str || '').trim();
+  var trim = function(x){ return x.replace(/^[\s·\-\/|,,、]+|[\s·\-\/|,,、]+$/g, ''); };
+  var cjk = s.search(/[\u3400-\u9fff\uf900-\ufaff]/);
+  if (cjk < 0) return { th: trim(s), zh: '' };
+  var th = trim(s.slice(0, cjk)), zh = trim(s.slice(cjk));
+  if (!th){
+    var thai = zh.search(/[\u0e00-\u0e7f]/);
+    if (thai > 0){ th = trim(zh.slice(thai)); zh = trim(zh.slice(0, thai)); }
+  }
+  return { th: th, zh: zh };
+}
+/* 显示用:两种名字都有就用分隔符连起来,只有一种就只显示那一种(不留个孤零零的「·」) */
+function tierLabel(t, sep){
+  return [t.th, t.zh].filter(function(x){ return x && String(x).trim(); }).join(sep == null ? ' · ' : sep);
+}
+function tierLabelHTML(t){
+  var a = [];
+  if (t.th) a.push(esc(t.th));
+  if (t.zh) a.push('<span class="cn">' + esc(t.zh) + '</span>');
+  return a.join(' &nbsp;·&nbsp; ');
+}
 function renderTierRows(){
   var tb = $('#tierRows'); tb.innerHTML = '';
   S.tiers.forEach(function(t, idx){
     var tr = el('tr');
-    var ord = el('td','ord', (idx + 1) + (idx === S.tiers.length - 1 ? ' 压轴' : ''));
+    var ord = el('td','ord', String(idx + 1));
+    if (idx === S.tiers.length - 1) ord.appendChild(el('small', 'ord-top', '压轴'));   // 压轴单独一小行,手机上不挤进名字框
     tr.appendChild(ord);
     function cell(type, val, key, min){
       var td = el('td'); var inp = document.createElement('input');
@@ -2307,8 +2333,11 @@ function renderTierRows(){
       inp.oninput = function(){ t[key] = type === 'number' ? Math.max(1, +inp.value || 1) : inp.value; };
       td.appendChild(inp); return td;
     }
-    tr.appendChild(cell('text', t.th, 'th'));
-    tr.appendChild(cell('text', t.zh, 'zh'));
+    /* 泰文名和中文名合在一个框里填,例如「รางวัลที่ 3 三等奖」;按文字自动拆开存 */
+    var ntd = el('td'), nin = document.createElement('input');
+    nin.type = 'text'; nin.value = tierLabel(t, ' '); nin.placeholder = 'รางวัลที่ 1 一等奖';
+    nin.oninput = function(){ var p = splitTierName(nin.value); t.th = p.th; t.zh = p.zh; };
+    ntd.appendChild(nin); tr.appendChild(ntd);
     tr.appendChild(cell('number', t.quota, 'quota', 1));
     tr.appendChild(cell('number', t.per, 'per', 1));
     var td = el('td','ops');
@@ -2520,7 +2549,7 @@ function renderWinners(){
     var ws = S.winners.filter(function(x){ return x.tierId === t.id; });
     if (!ws.length) return;
     var g = el('div','wgrp');
-    g.appendChild(el('div','wgrp-h', t.th + '  ·  ' + t.zh + '  ·  ' + ws.length + ' คน / 人'));
+    g.appendChild(el('div','wgrp-h', tierLabel(t, '  ·  ') + '  ·  ' + ws.length + ' คน / 人'));
     var grid = el('div','wrows');
     ws.forEach(function(x, i){
       var r = el('div','wrow');
@@ -3267,7 +3296,7 @@ function undoAsk(){
   }).join('\n');
   if (!confirm(
     'ยกเลิกรอบล่าสุด?  撤销上一轮?\n\n' +
-    (t ? t.th + ' · ' + t.zh + '\n' : '') +
+    (t ? tierLabel(t) + '\n' : '') +
     '这 ' + last.people.length + ' 位的中奖资格会被取消:\n' + names +
     '\n\n他们会回到待抽池,可以重新抽。')) return;
   undo();

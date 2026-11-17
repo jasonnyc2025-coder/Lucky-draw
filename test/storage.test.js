@@ -64,8 +64,8 @@ module.exports = async function run({ url, staffXlsx }) {
     await menu(page, '#bTiers');
     await page.waitForSelector('#vTiers.on');
     const ins = await page.$$('#tierRows tr:nth-child(1) input');
-    await ins[2].fill('4');
-    await ins[3].fill('2');
+    await ins[1].fill('4');
+    await ins[2].fill('2');
     await page.click('#bSaveTiers');
     await page.waitForTimeout(300);
 
