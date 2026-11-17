@@ -226,6 +226,45 @@ module.exports = async function run({ url }) {
     R.check('投影一次抽 6 人:每张卡高度一致、整轮不跳',
             jTv.heights.length === 1 && jTv.fonts.length === 1 && !jTv.clipped, JSON.stringify(jTv));
 
+    /* iPhone 加到主屏幕:全屏显示,内容从屏幕最顶上画起。
+       原来顶栏钻到状态栏 / 灵动岛底下,「名单」「设置」点不到,名单导不进去。
+       用 CDP 模拟 iPhone 的安全区(顶 59px、底 34px)。 */
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      pg.on('dialog', d => d.accept());
+      const cdp = await c.newCDPSession(pg);
+      let emu = true;
+      try { await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 59, bottom: 34, left: 0, right: 0 } }); }
+      catch (e) { emu = false; }
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(800);
+      if (!emu) {
+        R.check('iPhone 安全区(这个浏览器不支持模拟,跳过)', true, 'Emulation.setSafeAreaInsetsOverride 不可用');
+      } else {
+        const m = await pg.evaluate(() => {
+          const top = [...document.querySelectorAll('.topbar .tbtn')].filter(b => b.offsetParent)
+            .map(b => Math.round(b.getBoundingClientRect().top));
+          const ctl = [...document.querySelectorAll('.controls button')].filter(b => b.offsetParent)
+            .map(b => Math.round(b.getBoundingClientRect().bottom));
+          return { minTop: Math.min(...top), maxBottom: Math.max(...ctl), vh: innerHeight };
+        });
+        R.check('iPhone 主屏幕 App:顶栏按钮都在状态栏下面(点得到「名单」)',
+                m.minTop >= 59, JSON.stringify(m));
+        R.check('iPhone 主屏幕 App:底部按钮在底部横条上面',
+                m.maxBottom <= m.vh - 34, JSON.stringify(m));
+        await pg.click('#bNames'); await pg.waitForTimeout(250);
+        const hd = await pg.evaluate(() => ({
+          open: document.querySelector('#vNames').classList.contains('on'),
+          close: Math.round(document.querySelector('#vNames [data-close]').getBoundingClientRect().top),
+        }));
+        R.check('iPhone 上点「名单」能打开,面板的「关闭」也不在状态栏底下',
+                hd.open && hd.close >= 59, JSON.stringify(hd));
+      }
+      await c.close();
+    }
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();
