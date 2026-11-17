@@ -739,6 +739,17 @@ td input{padding:9px 10px;font-size:15px}
   padding-right:max(20px, env(safe-area-inset-right,0px));
 }
 .toast{bottom:calc(26px + env(safe-area-inset-bottom,0px))}
+/* 手机 / 平板:提示条放到屏幕上方(状态栏下面)。
+   iPhone 主屏幕 App 底下有一条系统占着的区域(大约状态栏那么高),
+   放在底部的提示条会被切掉半截;上方状态栏下面这块是一定看得到的。
+   电脑 / 投影还是放底部,不挡舞台中间的 Logo 和名字。 */
+@media (hover:none) and (pointer:coarse){
+  .toast{
+    bottom:auto;top:calc(env(safe-area-inset-top,0px) + 10px);
+    opacity:0;transform:translate(-50%,-24px);transition:transform .28s, opacity .28s;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+}
 /* 加到主屏幕后(没有地址栏),直接钉满整块屏幕。
    iPhone 主屏幕 App 里 100svh 会少算一截,底下空出一条 —— 用 fixed + inset:0 就没有这个问题。
    浏览器里还是用 100svh(地址栏一收一放不重排)。 */
@@ -1073,7 +1084,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v55';
+var APP_VERSION = 'v56';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 

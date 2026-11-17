@@ -102,6 +102,17 @@ module.exports = async function run({ url }) {
     R.check('重名没工号会提醒去核对,而不是悄悄删掉', /重名/.test(st.note), st.note);
     await p.close();
 
+    // 电脑上(有鼠标)提示条还在底部,不挡舞台中间
+    p = await fresh();
+    await p.evaluate(() => toast('测试提示 · ทดสอบ'));
+    await p.waitForTimeout(450);
+    const dt = await p.evaluate(() => {
+      const r = document.querySelector('#toast').getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight };
+    });
+    R.check('电脑上提示条在屏幕底部', dt.top > dt.vh / 2 && dt.bottom <= dt.vh, JSON.stringify(dt));
+    await p.close();
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();

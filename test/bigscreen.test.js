@@ -261,6 +261,17 @@ module.exports = async function run({ url }) {
         }));
         R.check('iPhone 上点「名单」能打开,面板的「关闭」也不在状态栏底下',
                 hd.open && hd.close >= 59, JSON.stringify(hd));
+        /* 提示条:iPhone 主屏幕 App 底下有一条系统区域会把底部的提示条切掉半截,
+           所以触屏设备上提示条放在上方(状态栏下面),要完整露出来 */
+        await pg.click('#vNames [data-close]'); await pg.waitForTimeout(200);
+        await pg.evaluate(() => toast('อัปเดตแล้ว · 已更新到 v99'));
+        await pg.waitForTimeout(450);
+        const tt = await pg.evaluate(() => {
+          const r = document.querySelector('#toast').getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height), vh: innerHeight };
+        });
+        R.check('iPhone 上提示条在上方、状态栏下面,整条露出来(原来在底部被切掉一半)',
+                tt.top >= 59 && tt.bottom < tt.vh / 2 && tt.h < 80, JSON.stringify(tt));
       }
       await c.close();
     }
