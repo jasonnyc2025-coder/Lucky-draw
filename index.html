@@ -85,6 +85,7 @@ if (window.navigator.standalone === true) document.documentElement.classList.add
   --cast-edge:#F4F8FC; --ink:#101418; --glow:111,187,255;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}   /* 按钮类自己写了 display,不加这条 hidden 会失效 */
 html,body{height:100%}
 body{
   background:var(--slag);
@@ -942,25 +943,22 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
           <button class="ghost" id="bPwOff" style="margin-left:auto">ยกเลิกรหัส 取消密码</button>
         </div>
         <p class="hint" id="pwNote"></p>
-        <p class="hint">设了密码以后,打开<b>「名单」「奖项设置」「设置」</b>、点<b>「撤销上一轮」「重置」</b>、换 Logo,都要先输密码。
-        「中奖」名单和开始抽奖不用密码。<br>
-        输对一次后,到<b style="color:var(--pour)">关掉 App(或刷新)</b>、或点「立即上锁」之前都不用再输。<br>
-        密码只存在这台设备上(存的是加密后的指纹,不是密码本身),不跟着「保存进度」的文件走。<br>
-        <b>忘了密码</b>:在浏览器设置里清除本网站的数据(名单、Logo 也会一起清掉),
-        或在另一台设备上用「保存进度」的 .json 文件恢复。</p>
       </div>
 
-      <div class="sec">
+      <!-- 平时不显示(用户要求设置里别放这一块)。只有「新版本没能自动装上」时才露出来,
+           里面也只显示「有新版本,点此更新」那一个按钮。 -->
+      <div class="sec" id="appSec" hidden>
         <div class="sec-h">แอป · 应用</div>
         <div class="row">
-          <button class="solid" id="bInstall2" style="display:none">ติดตั้งลงเครื่อง 安装到设备</button>
+          <button class="solid" id="bInstall2" style="display:none" hidden>ติดตั้งลงเครื่อง 安装到设备</button>
           <button class="ghost" id="bUpdate" style="display:none">มีเวอร์ชันใหม่ 有新版本,点此更新</button>
-          <button class="ghost" id="bCheckUpd">ตรวจหาอัปเดต 检查更新</button>
-          <span class="hint" style="margin:0" id="swNote">กำลังตรวจสอบ… 检查中…</span>
+          <button class="ghost" id="bCheckUpd" hidden>ตรวจหาอัปเดต 检查更新</button>
+          <span class="hint" style="margin:0" id="swNote" hidden>กำลังตรวจสอบ… 检查中…</span>
         </div>
       </div>
 
-      <div class="sec">
+      <!-- 「保存进度 / 恢复进度」:用户要求不显示。功能代码保留,以后要用把 hidden 去掉即可 -->
+      <div class="sec" id="progSec" hidden>
         <div class="sec-h">ความคืบหน้า · 进度存档</div>
         <div class="row">
           <button class="solid" id="bSaveProg">บันทึกไฟล์ 保存进度</button>
@@ -977,7 +975,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         </div>
         <p class="hint" style="margin-top:12px" id="storeNote">…</p>
         <p class="hint">名单、Logo、奖项设置、已中奖名单会自动存在这台设备的浏览器里。<b style="color:var(--pour)">误关页面、断电、手机杀后台,重新打开会自动接着上次继续</b>,不用手动恢复。<br>
-        数据只在本机,不上传任何地方。换设备或换浏览器不会同步 —— 那种情况用上面的「保存进度」导出 .json 带走。<br>
+        数据只在本机,不上传任何地方。换设备或换浏览器不会同步。<br>
         「清除本机数据」会连同名单和 Logo 一起删掉,无法撤销。</p>
       </div>
 
@@ -1075,7 +1073,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v54';
+var APP_VERSION = 'v55';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1084,7 +1082,7 @@ function renderVersion(){
   var line = '版本 ' + APP_VERSION + ' · ' + APP_DATE;
   if (swVersion === null)      line += '  ·  离线缓存:未启用或检查中';
   else if (swVersion === APP_VERSION) line += '  ·  离线缓存 ' + swVersion + ' ✓ 已是最新';
-  else line += '  ·  ⚠ 离线缓存还是 ' + swVersion + ',你看到的可能是旧版,点下面「检查更新」';
+  else line += '  ·  ⚠ 离线缓存还是 ' + swVersion + ',关掉 App 重新打开就会更新';
   n.textContent = line;
 }
 
@@ -2459,7 +2457,7 @@ function clearRoster(){
     '会删掉全部 ' + total + ' 人(' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖),\n' +
     '已经开出的中奖结果一并清空。\n\n' +
     '奖项设置和 Logo 保留。\n\n' +
-    '这一步无法撤销 —— 要留底的话先到「设置 → 保存进度」导出。')) return;
+    '这一步无法撤销。')) return;
 
   S.pool = []; S.winners = []; S.history = [];
   syncActive();
@@ -3030,13 +3028,13 @@ function autosave(){
       storeNote('已自动保存 · ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +
                 ' · ' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖');
     }).catch(function(){
-      storeNote('บันทึกอัตโนมัติไม่สำเร็จ · 自动保存失败,请用「保存进度」导出文件');
+      storeNote('บันทึกอัตโนมัติไม่สำเร็จ · 自动保存失败,请先别关掉这个页面');
     });
   }, 400);
 }
 /* 开机恢复。IndexedDB 是异步的,先把空界面画出来,读到了再重画。 */
 function bootRestore(){
-  if (!DB.supported){ storeNote('เบราว์เซอร์นี้เก็บไม่ได้ · 此浏览器不支持本机存档,请用「保存进度」'); return; }
+  if (!DB.supported){ storeNote('เบราว์เซอร์นี้เก็บไม่ได้ · 此浏览器不支持本机存档,关掉页面后名单不会保留'); return; }
   DB.get().then(function(d){
     if (!d || !Array.isArray(d.tiers) || !Array.isArray(d.pool)){
       storeNote('ยังไม่มีข้อมูลในเครื่อง · 本机还没有存档');
@@ -3702,6 +3700,7 @@ bootRestore();
       }
 
       $('#bUpdate').style.display = '';
+      $('#appSec').hidden = false;      // 平时藏着的「应用」那块,这时候才露出来
       $('#bUpdate').onclick = function(){
         toast('กำลังอัปเดต · 正在更新…');
         try { sessionStorage.setItem(JUST_UPDATED, APP_VERSION); } catch(e){}

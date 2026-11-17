@@ -89,6 +89,17 @@ module.exports = async function run({ url, fixtures }) {
 
     const ver = await peek(page, () => document.querySelector('#verNote').textContent, '');
     R.check('设置里的版本行显示缓存已是最新', /已是最新/.test(ver), ver.trim());
+    /* 设置里不放「应用」「进度存档」两块(用户要求),管理密码下面也不放大段说明 */
+    const plain = await peek(page, () => {
+      const shown = id => { const e = document.getElementById(id); return !!(e && e.checkVisibility && e.checkVisibility({ checkVisibilityCSS: true })); };
+      document.querySelector('#vSetup').classList.add('on');
+      const r = { app: shown('appSec'), prog: shown('progSec'),
+                  pwHelp: /设了密码以后/.test(document.querySelector('#lockSec').textContent) };
+      document.querySelector('#vSetup').classList.remove('on');
+      return r;
+    }, {});
+    R.check('设置里平时不显示「应用」「进度存档」,管理密码下面没有大段说明',
+            plain.app === false && plain.prog === false && plain.pwHelp === false, JSON.stringify(plain));
     await page.close();
 
     // ================= 2. 活动当中不许自己刷新 =================
@@ -115,12 +126,16 @@ module.exports = async function run({ url, fixtures }) {
       alive: !!window.__alive,                       // 页面没被刷掉
       paste: document.querySelector('#paste').value, // 输入的内容还在
       btn: document.querySelector('#bUpdate').style.display !== 'none',
+      appSec: !document.querySelector('#appSec').hidden,
+      checkBtn: !document.querySelector('#bCheckUpd').hidden,
       ver: window.swVersion,
     }), {});
     R.check('面板开着、粘贴框有内容时,绝不自动刷新(不然输入的名单会没)',
             held.alive && held.paste === '正在输入的名单, X1', JSON.stringify(held));
     R.check('这时候只把「有新版本」按钮亮出来,等用户自己点',
             held.btn, 'btn=' + held.btn);
+    R.check('平时藏着的「应用」这时才露出来,里面只有「有新版本」(没有检查更新按钮)',
+            held.appSec && !held.checkBtn, JSON.stringify(held));
 
     // 关掉面板、清空输入,点那个按钮应该真的能更新(原来这里有 bug:按钮亮着但点了没反应)
     if (await page.isVisible('#paste')) await openImport(page); await page.fill('#paste', '');

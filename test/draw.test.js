@@ -310,7 +310,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     // ---------- 7. 保存进度 ----------
     await menu(page, '#bSetup');
     await page.waitForSelector('#vSetup.on');
-    const dl2 = (await Promise.all([page.waitForEvent('download'), page.click('#bSaveProg')]))[0];
+    const dl2 = (await Promise.all([page.waitForEvent('download'), page.$eval('#bSaveProg', b => b.click())   /* 设置里这块已不显示,功能保留,直接触发 */]))[0];
     const jsonPath = path.join(fixtures, 'progress.json');
     await dl2.saveAs(jsonPath);
     const prog = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
