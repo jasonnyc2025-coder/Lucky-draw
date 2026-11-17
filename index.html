@@ -797,8 +797,8 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
     <button class="tbtn" id="bNames"><span class="l-th">รายชื่อ</span> <span class="l-zh">名单</span></button>
     <button class="tbtn" id="bInstall" style="display:none"><span class="l-th">⬇ ติดตั้ง</span> <span class="l-zh">安装</span></button>
     <button class="tbtn" id="bSetup"><span class="l-th">ตั้งค่า</span> <span class="l-zh">设置</span></button>
-    <button class="tbtn icon" id="bSound">🔊</button>
-    <button class="tbtn icon" id="bFull">⛶</button>
+    <!-- 🔊 / ⛶ 从顶栏挪进「设置 → 音效」了(用户要求)。#bSound 留着不显示:M 键静音还要用它 -->
+    <button class="tbtn icon" id="bSound" hidden>🔊</button>
   </header>
 
   <div class="main">
@@ -1088,6 +1088,10 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
           </label>
           <button class="ghost" id="bTestSnd">ทดสอบ 试听</button>
         </div>
+        <!-- 原来在顶栏右上角的全屏按钮(F 键也行)。设备不支持全屏(iPhone)就不显示 -->
+        <div class="row" id="fullRow" style="margin-top:14px">
+          <button class="ghost" id="bFull">⛶ เต็มจอ 全屏</button>
+        </div>
       </div>
 
     </div>
@@ -1101,7 +1105,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v62';
+var APP_VERSION = 'v63';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -3346,10 +3350,23 @@ function resetAsk(){
   syncActive();
   renderRail(); resetStage(); autosave(); toast('รีเซ็ตแล้ว · 已重置');
 }
+/* 全屏。iPad 的 Safari 只有带 webkit 前缀的版本;iPhone 根本不支持(加到主屏幕后本来就是全屏),
+   不支持就把按钮藏起来,免得点了没反应 */
+var docEl = document.documentElement;
+var fsReq = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+var fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+function fsOn(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function syncFullBtn(){ $('#bFull').textContent = fsOn() ? '⛶ ออกจากเต็มจอ 退出全屏' : '⛶ เต็มจอ 全屏'; }
+if (!fsReq) $('#fullRow').hidden = true;
 $('#bFull').onclick = function(){
-  if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen().catch(function(){});
+  if (!fsReq) return;
+  try {
+    var r = fsOn() ? fsExit.call(document) : fsReq.call(docEl);
+    if (r && r.catch) r.catch(function(){});
+  } catch(e){}
 };
+document.addEventListener('fullscreenchange', syncFullBtn);
+document.addEventListener('webkitfullscreenchange', syncFullBtn);
 $('#bNames').onclick = function(){ guard(function(){ importFoldFor = null; renderPoolList(); $('#vNames').classList.add('on'); }); };
 $('#bTiers').onclick = function(){ guard(function(){ renderTierRows(); $('#vTiers').classList.add('on'); }); };
 $('#bWinners').onclick = function(){ renderWinners(); $('#vWinners').classList.add('on'); };
@@ -3471,7 +3488,7 @@ $('#bTtsTest').onclick = function(){
   var tier = tierById(S.activeTier) || S.tiers[0] ||
              { th:'รางวัลที่ 1', zh:'一等奖' };
   var l = TTS.lang === 'auto' ? (langOfName(who.name) || 'th') : TTS.lang;
-  if (!A.on){ toast('เสียงปิดอยู่ · 右上角喇叭是静音状态,语音也不会念。先点一下 🔇 打开'); return; }
+  if (!A.on){ toast('เสียงปิดอยู่ · 「开启音效」关着,语音也不会念。先把它打开'); return; }
   var text = phraseFor(who.name, tier, l);
   toast('กำลังพูด · 正在念:' + text);
   var ok = speak(text, l, function(started){

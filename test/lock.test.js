@@ -38,6 +38,15 @@ module.exports = async function run({ url }) {
       const vis = [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden).map(e => e.id || e.querySelector('.sec-h').textContent.trim());
       return vis.slice(0, 2);
     });
+    const moved = await page.evaluate(() => {
+      const vis = e => !!(e && e.checkVisibility && e.checkVisibility({ checkVisibilityCSS: true }));
+      const full = document.querySelector('#bFull');
+      return { topIcons: [...document.querySelectorAll('.topbar .tbtn.icon')].filter(vis).length,
+               fullVis: vis(full), fullInSound: !!full.closest('.sec') &&
+                 /音效/.test(full.closest('.sec').querySelector('.sec-h').textContent) };
+    });
+    R.check('顶栏右上角的 🔊 / ⛶ 去掉了;全屏按钮在「设置 → 音效」下面',
+            moved.topIcons === 0 && moved.fullVis && moved.fullInSound, JSON.stringify(moved));
     R.check('设置里第一块是「公司 Logo」,紧接着是「管理密码」',
             order[0] === 'logoSec' && order[1] === 'lockSec', JSON.stringify(order));
     await page.fill('#pwNew', '12'); await page.fill('#pwNew2', '12');

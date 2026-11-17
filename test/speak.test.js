@@ -179,7 +179,7 @@ module.exports = async function run({ url }) {
     await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn'); await page.waitForTimeout(150);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
-    await menu(page, '#bSound'); await page.waitForTimeout(150);          // 静音
+    await page.$eval('#bSound', b => b.click());   /* 顶栏不显示了,M 键 / 设置里的开关走的是同一个逻辑 */ await page.waitForTimeout(150);          // 静音
     await page.evaluate(() => {
       S.pool = window.__poolCopy.map(x => Object.assign({}, x));
       S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
@@ -187,10 +187,10 @@ module.exports = async function run({ url }) {
     });
     await page.click('#bPour'); await page.waitForTimeout(1000);
     await page.click('#bPour'); await page.waitForTimeout(5500);
-    R.check('右上角喇叭静音时,语音也一起静音',
+    R.check('静音时语音也一起静音',
             await page.evaluate(() => window.__said.length) === 0,
             JSON.stringify(await page.evaluate(() => window.__said)));
-    await menu(page, '#bSound'); await page.waitForTimeout(150);          // 打开回来
+    await page.$eval('#bSound', b => b.click());   /* 顶栏不显示了,M 键 / 设置里的开关走的是同一个逻辑 */ await page.waitForTimeout(150);          // 打开回来
 
     // ---------- 正在念的时候按 M:马上闭嘴(揭晓时喇叭按钮被盖住,要能用键盘) ----------
     await page.evaluate(() => {
