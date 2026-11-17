@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -189,8 +189,8 @@ module.exports = async function run({ url }) {
 
     // 滚动时要收起来,把高度让给名字
     await menu(page, '#bNames'); await page.waitForTimeout(220);
-    await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
-    await page.click('#bApplyPaste'); await page.waitForTimeout(400);
+    await openImport(page); await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
+    await openImport(page); await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     await page.click('#bPour'); await page.waitForTimeout(900);
     R.check('抽奖滚动时公司标识自动收起(高度全让给名字)',
             await page.evaluate(() =>
@@ -202,8 +202,8 @@ module.exports = async function run({ url }) {
 
     // ---------- 换名单不该动 Logo 和主题 ----------
     await menu(page, '#bNames'); await page.waitForTimeout(250);
-    await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
-    await page.click('#bApplyPaste'); await page.waitForTimeout(400);
+    await openImport(page); await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
+    await openImport(page); await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     R.check('导入新名单不会动 Logo、公司名和主题',
             await page.evaluate(() => !!S.logo && S.theme === 'gala' && !!S.org.main));
 

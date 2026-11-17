@@ -232,5 +232,12 @@ async function menu(page, sel){
   await page.click(sel);
 }
 
-module.exports = { menu, ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,
+
+/* 已经有名单时,「导入名单」那一块默认折起来(要换名单才点开)。
+   测试里粘贴 / 选文件之前先点开它 —— 跟现场的人先点一下「导入名单」一样;已经开着就什么都不做。 */
+async function openImport(page){
+  await page.evaluate(() => { const d = document.querySelector('#secImport'); if (d && !d.open) d.open = true; });
+}
+
+module.exports = { menu, openImport, ROOT, buildHarness, startServer, makeStaffXlsx, makeStaffPdf, makeBlankPdf,
                    staffRows, reporter, chromium };

@@ -4,7 +4,7 @@
    什么时候念、什么时候掐断。 */
 'use strict';
 
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 const MOCK = () => {
   const list = [
@@ -127,7 +127,7 @@ module.exports = async function run({ url }) {
     await menu(page, '#bNames'); await page.waitForTimeout(200);
     await page.evaluate(r => { S.fromPdf = false; loadRows(r); }, ROWS);
     await page.waitForTimeout(250);
-    await page.click('#bApplyFile'); await page.waitForTimeout(350);
+    await openImport(page); await page.click('#bApplyFile'); await page.waitForTimeout(350);
     await page.evaluate(() => {
       S.tiers = [{ id: 't1', th: 'รางวัลที่ 3', zh: '三等奖', quota: 9, per: 3 }];
       S.winners = []; S.history = [];

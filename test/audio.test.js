@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -39,9 +39,9 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(700);
 
     await menu(page, '#bNames'); await page.waitForTimeout(250);
-    await page.fill('#paste', Array.from({ length: 12 },
+    await openImport(page); await page.fill('#paste', Array.from({ length: 12 },
       (_, i) => `测试${i + 1}, T${i + 1}`).join('\n'));
-    await page.click('#bApplyPaste'); await page.waitForTimeout(400);
+    await openImport(page); await page.click('#bApplyPaste'); await page.waitForTimeout(400);
 
     R.check('默认开着音效', await page.evaluate(() => A.on === true));
 

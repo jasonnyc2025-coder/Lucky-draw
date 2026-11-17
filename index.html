@@ -540,6 +540,27 @@ input,select{font:inherit;color:inherit}
 }
 .drop.over{border-color:var(--pour);background:rgba(var(--glow),.06)}
 .drop p{font-size:16px;color:var(--ash);margin-top:10px}
+/* 拖文件只有电脑上能用,手机 / 平板上这句话是多余的 */
+@media (hover:none){ .drop-tip{display:none} }
+
+/* 名单面板:
+   · 还没有名单 → 只显示「导入名单」,排在最上面;
+   · 有名单了   → 名单在上,「导入名单」折起来(要换一份名单时再点开);
+   · 四个按钮的说明默认收起来,点「怎么用」才展开。 */
+.names-b{display:flex;flex-direction:column}
+.names-b.empty #secPool{display:none}
+.names-b.empty #secImport{margin-top:0}
+details.fold > summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:10px}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary::after{content:'▾';margin-left:auto;color:var(--pour);transition:transform .2s}
+details.fold:not([open]) > summary{margin-bottom:0;padding-bottom:0;border-bottom:none}
+details.fold:not([open]) > summary::after{transform:rotate(-90deg)}
+.fold-hint{font-size:12.5px;letter-spacing:0;color:var(--ash)}
+.howto{margin-top:14px}
+.howto > summary{cursor:pointer;font-size:14px;color:var(--ash);list-style:none;padding:4px 0}
+.howto > summary::-webkit-details-marker{display:none}
+.howto[open] > summary{color:var(--bone)}
+.howto .notes{margin-top:8px}
 .filepick{
   display:inline-block;font-family:var(--f-util);font-weight:600;font-size:15px;letter-spacing:.1em;
   padding:11px 22px;border:1px solid var(--pour);color:var(--pour);border-radius:2px;cursor:pointer;transition:.16s;
@@ -633,6 +654,7 @@ td input{padding:9px 10px;font-size:15px}
   position:fixed;left:50%;bottom:26px;transform:translate(-50%,90px);z-index:90;
   background:var(--shell-2);border:1px solid var(--line);border-left:3px solid var(--pour);
   padding:14px 22px;border-radius:2px;font-size:16px;transition:transform .28s;max-width:90vw;
+  width:max-content;          /* left:50% 时默认只按半屏宽排版,短句也会折成两行 */
   pointer-events:none;      /* 提示条只是给人看的,别挡住底下的按钮 */
 }
 .toast.on{transform:translate(-50%,0)}
@@ -677,6 +699,15 @@ td input{padding:9px 10px;font-size:15px}
   /* 手机竖屏:顶栏按钮泰文在上、中文在下叠两行,小 Logo 先藏起来(舞台正中已经有大 Logo),
      这样一行就放得下,不会折成两排把舞台往下挤 */
   .topbar .logo{display:none!important}
+  /* 面板在手机上:外框、分区的留白收小,两个大按钮并排不叠成两行 */
+  .veil{padding-left:10px;padding-right:10px}
+  .panel-b{padding:14px}
+  .sec{padding:14px 14px 16px}
+  .act{flex:1 1 0;min-width:0;font-size:15px;padding:12px 8px}
+  .drop{padding:18px 12px}
+  .plist{grid-template-columns:repeat(2,minmax(0,1fr));max-height:46svh}
+  .prow{padding-left:8px;gap:0;font-size:14.5px}
+  .pbtn{width:27px;height:30px;font-size:15px}
   .ingot{padding:14px 8px}          /* 窄卡左右各留 30px 只剩 40 多像素放名字 */
   .topbar{padding:6px 8px;gap:5px;justify-content:space-between}
   .topbar .tbtn{display:flex;flex-direction:column;align-items:center;line-height:1.15;
@@ -782,13 +813,14 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 <div class="veil" id="vNames">
   <div class="panel">
     <div class="panel-h"><h2>รายชื่อผู้เข้าร่วม <em class="cn">参与名单</em></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
-    <div class="panel-b">
-      <div class="sec">
+    <div class="panel-b names-b" id="namesBody">
+      <div class="sec" id="secPool">
         <div class="sec-h">รายชื่อปัจจุบัน · 当前名单</div>
         <p class="tagline" id="poolSummary">…</p>
+        <p class="hint" id="poolNote" style="margin-top:6px"></p>
         <div class="row" style="margin-top:14px">
           <button class="act" id="bAddPerson">+ เพิ่มคน<small>添加一人</small></button>
-          <button class="act danger" id="bClearPool">🗑 ล้างรายชื่อทั้งหมด<small>清空名单</small></button>
+          <button class="act danger" id="bClearPool">🗑 ล้างรายชื่อ<small>清空名单</small></button>
         </div>
         <div class="psearch" id="psearchWrap">
           <input type="text" id="poolSearch" autocomplete="off"
@@ -797,6 +829,8 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         </div>
         <div class="plist" id="plist"></div>
         <p class="hint pempty" id="poolEmpty" style="display:none"></p>
+        <details class="howto">
+        <summary>ⓘ วิธีใช้ · 这几个按钮怎么用</summary>
         <div class="notes">
           <div class="note"><span class="k">【+ เพิ่มคน · 添加一人】</span>
             <span class="v">เพิ่มทีละคน · 临时来人直接加一个,不用重新导整份名单。</span></div>
@@ -809,17 +843,18 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
             <span class="v">ลบออกจากรายชื่อ · 从名单里删除。已中奖的(打勾那些)不能删,
             要删得先「撤销上一轮」或「重置」。</span></div>
         </div>
+        </details>
       </div>
 
-      <div class="sec">
-        <div class="sec-h">นำเข้ารายชื่อ · 导入名单(两种方式,任选一种)</div>
+      <details class="sec fold" id="secImport" open>
+        <summary class="sec-h">นำเข้ารายชื่อ · 导入名单<span class="fold-hint" id="importHint"></span></summary>
 
         <div class="sub">
         <div class="sub-h"><i>1</i><span>นำเข้าไฟล์ · 从文件导入<em>Excel · CSV · PDF</em></span></div>
         <div class="drop" id="drop">
           <label class="filepick">เลือกไฟล์ 选择文件<input type="file" id="file" accept=".csv,.xlsx,.xls,.txt,.pdf" hidden></label>
-          <p>Excel (.xlsx / .xls) · CSV · PDF · ลากไฟล์มาวางได้ 可拖拽</p>
-          <p class="hint" style="margin-top:6px">PDF 只能读出文字版的内容;扫描件、拍照转的 PDF 里没有文字,读不出来。</p>
+          <p class="drop-tip">ลากไฟล์มาวางได้ · 也可以把文件拖进来</p>
+          <p class="hint" style="margin-top:6px">PDF 要是文字版的,扫描件读不出来</p>
         </div>
         <div id="mapWrap" style="display:none;margin-top:16px">
           <p class="hint" style="margin-top:0">把每一列派一个用处。<b style="color:var(--pour)">姓名</b>可以选好几列,
@@ -842,10 +877,9 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <textarea id="paste"></textarea>
         <div class="row" style="margin-top:12px">
           <button class="solid" id="bApplyPaste">ใช้รายชื่อนี้ 使用此名单</button>
-          <span class="hint" style="margin:0" id="poolNote"></span>
         </div>
         </div>
-      </div>
+      </details>
     </div>
   </div>
 </div>
@@ -1083,7 +1117,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v52';
+var APP_VERSION = 'v53';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1983,10 +2017,11 @@ function setPool(list){
   S.pool = r.list;
   S.winners = []; S.history = [];
   syncActive();
+  importFoldFor = null;          // 导完了:把「导入名单」收起来,名单露出来
   renderRail(); resetStage(); renderPoolList();
   autosave();
 
-  var note = r.list.length + ' 人已载入';
+  var note = 'โหลดแล้ว ' + r.list.length + ' คน · ' + r.list.length + ' 人已载入';
   if (r.dropped) note += ' · 去掉 ' + r.dropped + ' 条重复';
   if (r.ambiguous.length) note += ' · ⚠ ' + r.ambiguous.length + ' 个重名没有工号,请核对';
   $('#poolNote').textContent = note;
@@ -2320,12 +2355,23 @@ function hilite(tag, text, q){
 
 /* ---------- 当前名单 ---------- */
 var PLIST_CAP = 300;          // 名单很大时只画前 300 条,避免开面板卡顿
+/* 「导入名单」折不折:只在「有没有名单」变了的时候改,用户自己点开 / 收起的不去动它 */
+var importFoldFor = null;
+function syncImportFold(total){
+  var body = $('#namesBody'), imp = $('#secImport');
+  if (!body || !imp) return;
+  var empty = !total;
+  body.classList.toggle('empty', empty);
+  $('#importHint').textContent = empty ? '' : '换一份名单时点开 · 会替换现在的名单';
+  if (importFoldFor !== empty){ imp.open = empty; importFoldFor = empty; }
+}
 function renderPoolList(){
   var box = $('#plist'), sum = $('#poolSummary');
   if (!box || !sum) return;
   box.innerHTML = '';
 
   var total = S.pool.length + S.winners.length;
+  syncImportFold(total);
   if (!total){
     sum.innerHTML = '<span class="k">【สถานะ · 状态】</span>' +
                     '<span>ยังไม่มีรายชื่อ · 还没有导入名单,用下面的方式导入(Excel / CSV / PDF / 直接粘贴)。</span>';
@@ -3257,7 +3303,7 @@ $('#bFull').onclick = function(){
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen().catch(function(){});
 };
-$('#bNames').onclick = function(){ guard(function(){ renderPoolList(); $('#vNames').classList.add('on'); }); };
+$('#bNames').onclick = function(){ guard(function(){ importFoldFor = null; renderPoolList(); $('#vNames').classList.add('on'); }); };
 $('#bTiers').onclick = function(){ guard(function(){ renderTierRows(); $('#vTiers').classList.add('on'); }); };
 $('#bWinners').onclick = function(){ renderWinners(); $('#vWinners').classList.add('on'); };
 document.querySelectorAll('[data-close]').forEach(function(b){

@@ -3,7 +3,7 @@
    两边全是黑的,看起来就像把手机界面摆到了大屏中间。 */
 'use strict';
 
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 const ROWS = [
   ['รหัสพนักงาน', 'คำนำหน้า', 'ชื่อ(ไทย)', 'นามสกุล(ไทย)', 'แผนก'],
@@ -34,7 +34,7 @@ module.exports = async function run({ url }) {
     await menu(page, '#bNames'); await page.waitForTimeout(200);
     await page.evaluate(r => { S.fromPdf = false; loadRows(r); }, ROWS);
     await page.waitForTimeout(250);
-    await page.click('#bApplyFile'); await page.waitForTimeout(350);
+    await openImport(page); await page.click('#bApplyFile'); await page.waitForTimeout(350);
     await page.evaluate(() => {
       S.tiers = [{ id: 't1', th: 'รางวัลที่ 1', zh: '一等奖', quota: 3, per: 1 }];
       S.winners = []; S.history = [];

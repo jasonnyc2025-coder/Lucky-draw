@@ -2,7 +2,7 @@
    名单面板原来只是个导入界面,不显示已经导进去的人 —— 看着像空的。 */
 'use strict';
 
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 module.exports = async function run({ url }) {
   const R = reporter('名单增删改 roster');
@@ -36,9 +36,9 @@ module.exports = async function run({ url }) {
     await openNames();
     R.check('还没导入时说明清楚', /还没有导入名单/.test((await state()).summary), (await state()).summary);
 
-    await page.fill('#paste', ['李伟, EMP001', '王芳, EMP002', 'Vincent, EMP003',
+    await openImport(page); await page.fill('#paste', ['李伟, EMP001', '王芳, EMP002', 'Vincent, EMP003',
                                '张敏, EMP004', 'Spring, EMP005', 'John, EMP006'].join('\n'));
-    await page.click('#bApplyPaste');
+    await openImport(page); await page.click('#bApplyPaste');
     await page.waitForTimeout(400);
 
     // ---------- 2. 导入后能看到名单 ----------
@@ -268,6 +268,42 @@ module.exports = async function run({ url }) {
     await p4.waitForTimeout(1400);
     R.check('清空后重开页面,名单确实是空的',
             await p4.evaluate(() => S.pool.length === 0 && S.winners.length === 0));
+
+    // ---------- 面板不乱:没名单只显示导入;有名单时导入折起来,说明默认收起 ----------
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      pg.on('dialog', d => d.accept());
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(900);
+      await pg.evaluate(() => { S.pool = []; S.winners = []; S.history = []; syncActive(); renderRail(); resetStage(); });
+      const look = () => pg.evaluate(() => {
+        const vis = s => { const e = document.querySelector(s); return !!(e && (e.checkVisibility ? e.checkVisibility() : e.offsetParent)); };
+        const imp = document.querySelector('#secImport');
+        return { pool: vis('#secPool'), importOpen: imp.open, pasteVis: vis('#paste'),
+                 importTop: Math.round(imp.getBoundingClientRect().top),
+                 helpOpen: document.querySelector('.howto').open,
+                 actH: [...document.querySelectorAll('#secPool .act')].map(b => Math.round(b.getBoundingClientRect().height)) };
+      });
+      await pg.click('#bNames'); await pg.waitForTimeout(250);
+      const e0 = await look();
+      R.check('还没有名单:只显示「导入名单」,而且直接展开', !e0.pool && e0.importOpen && e0.pasteVis, JSON.stringify(e0));
+      await pg.fill('#paste', 'สมชาย,01001\nมาลี,01002\nอุดม,01003');
+      await pg.click('#bApplyPaste'); await pg.waitForTimeout(400);
+      await pg.click('#bNames'); await pg.waitForTimeout(250);
+      const e1 = await look();
+      R.check('导入后:当前名单在上面,「导入名单」折起来', e1.pool && !e1.importOpen && !e1.pasteVis, JSON.stringify(e1));
+      R.check('按钮说明默认收起,不占地方', !e1.helpOpen);
+      R.check('手机上「添加一人」「清空名单」两个按钮一样高(文字没有折成两行)',
+              e1.actH.length === 2 && Math.abs(e1.actH[0] - e1.actH[1]) <= 2, JSON.stringify(e1.actH));
+      await pg.click('#secImport > summary'); await pg.waitForTimeout(200);
+      R.check('点「导入名单」能展开,换一份名单', (await look()).pasteVis);
+      await pg.click('#bClearPool'); await pg.waitForTimeout(400);
+      const e2 = await look();
+      R.check('清空名单后又回到「只显示导入」', !e2.pool && e2.importOpen, JSON.stringify(e2));
+      await c.close();
+    }
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {

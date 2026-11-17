@@ -2,7 +2,7 @@
    以及扫描件那种没有文字的 PDF 会不会给出清楚的提示。 */
 'use strict';
 
-const { reporter, chromium, staffRows, menu } = require('./lib/harness');
+const { reporter, chromium, staffRows, menu, openImport } = require('./lib/harness');
 
 
 /* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
@@ -34,7 +34,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
 
     // ---------- 1. 文字版 PDF ----------
     await menu(page, '#bNames');
-    await page.setInputFiles('#file', staffPdf);
+    await openImport(page); await page.setInputFiles('#file', staffPdf);
     await page.waitForSelector('#mapWrap', { state: 'visible', timeout: 20000 });
 
     const parsed = await page.evaluate(() => ({
@@ -87,7 +87,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
 
     // ---------- 2. 走完导入 ----------
     await setCols(page, ['name', 'sub', '']);
-    await page.click('#bApplyFile');
+    await openImport(page); await page.click('#bApplyFile');
     await page.waitForTimeout(500);
     const pool = await page.evaluate(() => ({
       n: S.pool.length, first: S.pool[0],
@@ -99,7 +99,7 @@ module.exports = async function run({ url, staffPdf, blankPdf, usedLocalPdf }) {
 
     // ---------- 3. 扫描件(没有文字层) ----------
     await menu(page, '#bNames');
-    await page.setInputFiles('#file', blankPdf);
+    await openImport(page); await page.setInputFiles('#file', blankPdf);
     await page.waitForTimeout(2500);
     const toastTxt = await page.evaluate(() => document.querySelector('#toast').textContent);
     R.check('扫描件给出清楚的提示而不是静默失败',

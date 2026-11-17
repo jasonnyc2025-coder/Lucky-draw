@@ -2,7 +2,7 @@
    这里都是真的关闭页面再打开,不是直接改内存状态。 */
 'use strict';
 
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 // 1×1 红点 PNG,当 Logo 用
 const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ' +
@@ -50,14 +50,14 @@ module.exports = async function run({ url, staffXlsx }) {
     // ---------- 造数据 ----------
     await menu(page, '#bNames');
     if (staffXlsx) {
-      await page.setInputFiles('#file', staffXlsx);
+      await openImport(page); await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible' });
       await setCols(page, ['name', 'sub', '']);
-      await page.click('#bApplyFile');
+      await openImport(page); await page.click('#bApplyFile');
     } else {
-      await page.fill('#paste', Array.from({ length: 60 },
+      await openImport(page); await page.fill('#paste', Array.from({ length: 60 },
         (_, i) => 'Tester ' + (i + 1) + ', EMP' + (i + 1)).join('\n'));
-      await page.click('#bApplyPaste');
+      await openImport(page); await page.click('#bApplyPaste');
     }
     await page.waitForTimeout(400);
 

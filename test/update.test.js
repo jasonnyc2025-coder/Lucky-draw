@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 module.exports = async function run({ url, fixtures }) {
   const R = reporter('自动更新 update');
@@ -103,7 +103,7 @@ module.exports = async function run({ url, fixtures }) {
 
     // 打开名单面板 = 可能正在粘名单,这时候绝不能刷新
     await menu(page, '#bNames'); await page.waitForTimeout(300);
-    await page.fill('#paste', '正在输入的名单, X1');
+    await openImport(page); await page.fill('#paste', '正在输入的名单, X1');
     await page.evaluate(() => { window.__alive = Date.now(); });
 
     bump('v-next-2');
@@ -123,7 +123,7 @@ module.exports = async function run({ url, fixtures }) {
             held.btn, 'btn=' + held.btn);
 
     // 关掉面板、清空输入,点那个按钮应该真的能更新(原来这里有 bug:按钮亮着但点了没反应)
-    if (await page.isVisible('#paste')) await page.fill('#paste', '');
+    if (await page.isVisible('#paste')) await openImport(page); await page.fill('#paste', '');
     if (await page.isVisible('#vNames [data-close]')){
       await page.click('#vNames [data-close]'); await page.waitForTimeout(300);
     }
@@ -143,8 +143,8 @@ module.exports = async function run({ url, fixtures }) {
     await page.waitForTimeout(1800);
 
     await menu(page, '#bNames'); await page.waitForTimeout(250);
-    await page.fill('#paste', Array.from({ length: 20 }, (_, i) => `人${i + 1}, P${i + 1}`).join('\n'));
-    await page.click('#bApplyPaste'); await page.waitForTimeout(400);
+    await openImport(page); await page.fill('#paste', Array.from({ length: 20 }, (_, i) => `人${i + 1}, P${i + 1}`).join('\n'));
+    await openImport(page); await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     await page.click('#bPour'); await page.waitForTimeout(600);
     await page.evaluate(() => { window.__alive2 = 1; });
 

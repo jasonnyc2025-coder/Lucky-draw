@@ -3,7 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 
 /* 列映射现在是「每一列派一个用处」(不用 / 姓名 / 副信息),
@@ -48,7 +48,7 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     if (staffXlsx) {
       R.check('XLSX 组件加载', await page.evaluate(() => typeof XLSX !== 'undefined'));
       await menu(page, '#bNames');
-      await page.setInputFiles('#file', staffXlsx);
+      await openImport(page); await page.setInputFiles('#file', staffXlsx);
       await page.waitForSelector('#mapWrap', { state: 'visible', timeout: 5000 });
       const cols = await page.evaluate(() =>
         [...document.querySelectorAll('#cols .colrow')].map(r => r.querySelector('.ch b').textContent));
@@ -57,14 +57,14 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
       const demo = await page.evaluate(() => document.querySelector('#mapDemo').textContent);
       R.check('确认前先按舞台卡片的样子预览一遍(选错列一眼看得出)',
               /Tester|สมชาย|[\u4e00-\u9fa5]/.test(demo), demo);
-      await page.click('#bApplyFile');
+      await openImport(page); await page.click('#bApplyFile');
     } else {
       // 没装 xlsx 时退回粘贴导入,后面的断言不变
       const lines = Array.from({ length: 60 }, (_, i) =>
         'Tester ' + (i + 1) + ', EMP' + String(i + 1).padStart(3, '0')).join('\n');
       await menu(page, '#bNames');
-      await page.fill('#paste', lines);
-      await page.click('#bApplyPaste');
+      await openImport(page); await page.fill('#paste', lines);
+      await openImport(page); await page.click('#bApplyPaste');
     }
     await page.waitForTimeout(400);
 
@@ -386,8 +386,8 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     // ---------- 12. 粘贴导入 ----------
     await menu(page, '#bNames');
     await page.waitForSelector('#vNames.on');
-    await page.fill('#paste', 'สมชาย ทดสอบ, T001\n测试用户, T002\nTest User, T003');
-    await page.click('#bApplyPaste');
+    await openImport(page); await page.fill('#paste', 'สมชาย ทดสอบ, T001\n测试用户, T002\nTest User, T003');
+    await openImport(page); await page.click('#bApplyPaste');
     await page.waitForTimeout(400);
     const pasted = await page.evaluate(() => ({ p: S.pool.length, first: S.pool[0], w: S.winners.length }));
     R.check('粘贴导入 3 人并清空旧结果',

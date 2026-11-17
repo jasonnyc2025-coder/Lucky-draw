@@ -3,7 +3,7 @@
    结果总榜上大字是工号、小字是「นาย」,人名根本没出现。 */
 'use strict';
 
-const { reporter, chromium, menu } = require('./lib/harness');
+const { reporter, chromium, menu, openImport } = require('./lib/harness');
 
 /* 现场那份真名单的表头(工号 / 称谓 / 名 / 姓 / 部门)。
    部门那列必须被排除 —— 拼进名字里会变成「นาย อร่าม จันพางาม ตะกั่วอัลลอย-โรง2」。 */
@@ -69,7 +69,7 @@ module.exports = async function run({ url }) {
       s[0].value = 'sub'; s[1].value = 'name'; s[2].value = 'name'; s[3].value = 'name';
       previewMap();
     });
-    await page.click('#bApplyFile'); await page.waitForTimeout(500);
+    await openImport(page); await page.click('#bApplyFile'); await page.waitForTimeout(500);
     const pool = await page.evaluate(() => S.pool.slice(0, 2).map(x => x.name + '|' + x.sub));
     R.check('导进去的就是完整姓名 + 工号',
             pool[0] === 'นางสาว สมชาย ใจดี|15000', JSON.stringify(pool));
@@ -100,7 +100,7 @@ module.exports = async function run({ url }) {
       s[0].value = 'sub'; s[1].value = 'name'; s[2].value = 'name'; s[3].value = 'name';
       previewMap();
     });
-    await page.click('#bApplyFile'); await page.waitForTimeout(500);
+    await openImport(page); await page.click('#bApplyFile'); await page.waitForTimeout(500);
 
     // ---------- 2. 抽完 → 总榜上是名字,不是工号 ----------
     await page.evaluate(() => {
