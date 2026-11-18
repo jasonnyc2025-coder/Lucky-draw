@@ -612,6 +612,11 @@ details.fold:not([open]) > summary::after{transform:rotate(-90deg)}
 #secImport .sub-h i{border-color:rgb(var(--imp));color:rgb(var(--imp))}
 /* 蓝色主题本身就是蓝调,导入那块换成绿色,免得两块又撞色 */
 :root[data-theme="ink"] #secImport{--imp:92,190,110}
+/* 「添加奖项」:实心青绿底 + 深色字(原来淡橙字压在深棕底上看不清);和旁边橙色的「保存」也分得开 */
+#bAddTier{--add:46,182,162;background:rgb(var(--add));border-color:rgb(var(--add));color:#062420}
+#bAddTier small{opacity:.85;color:#062420}
+#bAddTier:hover{background:rgb(var(--add));filter:brightness(1.1);color:#062420}
+:root[data-theme="ink"] #bAddTier{--add:92,190,110}
 .ttsmore > summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px;
   font-size:13.5px;color:var(--ash);padding:4px 0}
 .ttsmore > summary::-webkit-details-marker{display:none}
@@ -779,7 +784,7 @@ td input{padding:9px 10px;font-size:15px}
   #vTiers table{table-layout:fixed}
   #vTiers th,#vTiers td{padding-left:3px;padding-right:3px}
   #vTiers th{letter-spacing:.02em;font-size:11.5px}
-  #vTiers th:nth-child(1){width:40px}
+  #vTiers th:nth-child(1){width:52px!important}   /* 表头上写死了 width:9%,不加 !important 压不住 */
   #vTiers th:nth-child(2){width:auto}
   #vTiers th:nth-child(3),#vTiers th:nth-child(4){width:19%}
   #vTiers th:nth-child(5){width:28px}
@@ -1192,7 +1197,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v73';
+var APP_VERSION = 'v74';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
