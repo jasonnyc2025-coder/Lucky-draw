@@ -187,14 +187,14 @@ module.exports = async function run({ url }) {
     R.check('标题和名字仍然在剩下的空间里居中',
             pos.gapToTitle > 40, '抬头到标题 ' + pos.gapToTitle + 'px');
 
-    // 滚动时要收起来,把高度让给名字
+    // 滚动时也留着(用户要求:抽奖过程中有公司 Logo 就放在上面)
     await menu(page, '#bNames'); await page.waitForTimeout(220);
     await openImport(page); await page.fill('#paste', ['甲, A1', '乙, A2', '丙, A3'].join('\n'));
     await openImport(page); await page.click('#bApplyPaste'); await page.waitForTimeout(400);
     await page.click('#bPour'); await page.waitForTimeout(900);
-    R.check('抽奖滚动时公司标识自动收起(高度全让给名字)',
+    R.check('抽奖滚动时公司标识留在舞台上面',
             await page.evaluate(() =>
-              getComputedStyle(document.querySelector('#stageHead')).display === 'none'));
+              getComputedStyle(document.querySelector('#stageHead')).display === 'flex'));
     await page.click('#bPour'); await page.waitForTimeout(4500);
     R.check('揭晓后又回来',
             await page.evaluate(() =>

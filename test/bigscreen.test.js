@@ -280,6 +280,38 @@ module.exports = async function run({ url }) {
       await c.close();
     }
 
+    /* 抽奖滚动中:有 Logo 就放在上面(原来滚动时收起来);
+       标题换成这一档(原来上一轮的「恭喜 … → 下一档」会留到这一轮滚动中) */
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(800);
+      await pg.evaluate(() => {
+        applyLogo('data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="orange"/></svg>'));
+        S.pool = ['Andrew', 'Ben', 'Cathy', 'Dan', 'Eve'].map(x => ({ name: x, sub: '' }));
+        S.tiers = [{ id: 'a', th: 'รางวัลที่ 3', zh: '三等奖', quota: 1, per: 1 },
+                   { id: 'b', th: 'รางวัลที่ 2', zh: '二等奖', quota: 2, per: 1 }];
+        S.winners = []; S.history = []; syncActive(); renderRail(); resetStage(); updateControls();
+      });
+      await pg.click('#bPour'); await pg.waitForTimeout(800); await pg.click('#bPour'); await pg.waitForTimeout(4500);
+      await pg.click('#bPour'); await pg.waitForTimeout(1200);          // 第二档开始滚
+      const r = await pg.evaluate(() => {
+        const cru = document.querySelector('#crucible').getBoundingClientRect();
+        const card = document.querySelector('.ingot').getBoundingClientRect();
+        return { rolling: S.rolling,
+                 head: getComputedStyle(document.querySelector('#stageHead')).display,
+                 eb: document.querySelector('#eyebrow').textContent.replace(/\s+/g, ' ').trim(),
+                 inside: card.bottom <= cru.bottom + 2 };
+      });
+      R.check('抽奖滚动中 Logo 留在舞台上面', r.rolling && r.head === 'flex' && r.inside, JSON.stringify(r));
+      R.check('新一轮一开始,标题就换成这一档(不再留着上一轮的「恭喜 … → 下一档」)',
+              /二等奖/.test(r.eb) && !/恭喜|ถัดไป/.test(r.eb), r.eb);
+      await pg.click('#bPour'); await pg.waitForTimeout(4500);
+      await c.close();
+    }
+
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
   } finally {
     await browser.close();
