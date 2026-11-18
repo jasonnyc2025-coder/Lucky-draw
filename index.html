@@ -785,6 +785,7 @@ td input{padding:9px 10px;font-size:15px}
   #vTiers th:nth-child(5){width:28px}
   #vTiers td input{padding:9px 6px}
   #vTiers .ord{font-size:12.5px;white-space:nowrap}
+  #vTiers th .nw{white-space:nowrap;display:inline-block}   /* 「顺序」别拆成「顺 / 序」 */
   #vTiers .del{padding:5px 4px}
   .plist{grid-template-columns:repeat(2,minmax(0,1fr));max-height:46svh}
   .prow{padding-left:8px;gap:0;font-size:14.5px}
@@ -1004,17 +1005,16 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
     <div class="panel-b">
       <table>
         <thead><tr>
-          <th style="width:9%">ลำดับ 顺序</th>
+          <th style="width:9%"><span class="nw">ลำดับ</span> <span class="nw">顺序</span></th>
           <th style="width:52%">ชื่อรางวัล · 奖项名称</th>
           <th style="width:15%">จำนวน 名额</th><th style="width:15%">ต่อรอบ 每轮</th><th></th>
         </tr></thead>
         <tbody id="tierRows"></tbody>
       </table>
       <div class="row" style="margin-top:16px">
-        <button class="ghost" id="bAddTier">+ เพิ่มรางวัล 添加奖项</button>
-        <button class="solid" id="bSaveTiers" style="margin-left:auto">บันทึก 保存</button>
+        <button class="act" id="bAddTier">+ เพิ่มรางวัล<small>添加奖项</small></button>
+        <button class="solid" id="bSaveTiers" style="margin-left:auto;align-self:stretch;min-width:120px">บันทึก 保存</button>
       </div>
-      <p class="hint">小奖先抽,特等奖最后。每轮 = 一次抽几人。</p>
     </div>
   </div>
 </div>
@@ -1192,7 +1192,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v72';
+var APP_VERSION = 'v73';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
