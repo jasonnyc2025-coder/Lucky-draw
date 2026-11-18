@@ -578,15 +578,20 @@ details.fold:not([open]) > summary::after{transform:rotate(-90deg)}
 /* 设置面板:每一块要一眼分得开(原来几块长得一模一样,连成一片)。
    · 标题前一个图标、字更大更亮,标题那一条垫一层淡淡的主题色底;
    · 左边一条主题色竖线;块与块之间拉开距离。 */
-#vSetup .sec{border-left:3px solid var(--pour);padding-top:0;overflow:hidden}
-#vSetup .sec + .sec{margin-top:22px}
-#vSetup .sec-h{
+#vSetup .sec,#vNames .sec{border-left:3px solid var(--pour);padding-top:0;overflow:hidden}
+#vSetup .sec + .sec,#vNames .sec + .sec{margin-top:22px}
+#vSetup .sec-h,#vNames .sec-h{
   display:flex;align-items:center;gap:10px;
   margin:0 -18px 16px;padding:12px 18px;
   font-size:16px;font-weight:700;letter-spacing:.04em;color:var(--whitehot);
   background:rgba(var(--glow),.10);border-bottom:1px solid rgba(var(--glow),.22);
 }
-#vSetup .sec-ic{font-style:normal;font-size:19px;line-height:1;flex:none}
+#vSetup .sec-ic,#vNames .sec-ic{font-style:normal;font-size:19px;line-height:1;flex:none}
+/* 名单面板里「导入名单」那块是可以折起来的:折起来时只剩标题条,下面不留空 */
+#vNames details.fold:not([open]){padding-bottom:0}
+#vNames details.fold:not([open]) > summary.sec-h{margin-bottom:0;border-bottom:none;padding-bottom:12px}
+#vNames .fold-hint{font-weight:400;font-size:12.5px;color:var(--ash);margin-left:auto;letter-spacing:0}
+#vNames details.fold > summary.sec-h::after{margin-left:6px}
 .ttsmore > summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px;
   font-size:13.5px;color:var(--ash);padding:4px 0}
 .ttsmore > summary::-webkit-details-marker{display:none}
@@ -742,8 +747,11 @@ td input{padding:9px 10px;font-size:15px}
   .veil{padding-left:10px;padding-right:10px}
   .panel-b{padding:14px}
   .sec{padding:14px 14px 16px}
-  #vSetup .sec{padding-top:0}
-  #vSetup .sec-h{margin:0 -14px 14px;padding:11px 14px;font-size:15px}
+  #vSetup .sec,#vNames .sec{padding-top:0}
+  #vSetup .sec-h,#vNames .sec-h{margin:0 -14px 14px;padding:11px 14px;font-size:15px}
+  #vNames details.fold:not([open]) > summary.sec-h{padding-bottom:11px}
+  #vNames .fold-hint{display:none}      /* 手机上放不下,右边的 ▸ 已经说明能点开 */
+  #vNames details.fold > summary.sec-h::after{margin-left:auto}
   .act{flex:1 1 0;min-width:0;font-size:15px;padding:12px 8px}
   .drop{padding:18px 12px}
   /* 奖项表:去掉上下箭头后把地方让给输入框,名字不再被截成「ราง:」 */
@@ -892,7 +900,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
     <div class="panel-h"><h2>รายชื่อผู้เข้าร่วม <em class="cn">参与名单</em></h2><button class="tbtn" data-close>ปิด 关闭</button></div>
     <div class="panel-b names-b" id="namesBody">
       <div class="sec" id="secPool">
-        <div class="sec-h">รายชื่อปัจจุบัน · 当前名单</div>
+        <div class="sec-h"><i class="sec-ic">👥</i>รายชื่อปัจจุบัน · 当前名单</div>
         <p class="tagline" id="poolSummary">…</p>
         <p class="hint" id="poolNote" style="margin-top:6px"></p>
         <div class="row" style="margin-top:14px">
@@ -924,7 +932,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
       </div>
 
       <details class="sec fold" id="secImport" open>
-        <summary class="sec-h">นำเข้ารายชื่อ · 导入名单<span class="fold-hint" id="importHint"></span></summary>
+        <summary class="sec-h"><i class="sec-ic">📥</i>นำเข้ารายชื่อ · 导入名单<span class="fold-hint" id="importHint"></span></summary>
 
         <div class="sub">
         <div class="sub-h"><i>1</i><span>นำเข้าไฟล์ · 从文件导入<em>Excel · CSV · PDF</em></span></div>
@@ -1156,7 +1164,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v67';
+var APP_VERSION = 'v68';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -2492,7 +2500,7 @@ function syncImportFold(total){
   if (!body || !imp) return;
   var empty = !total;
   body.classList.toggle('empty', empty);
-  $('#importHint').textContent = empty ? '' : '换一份名单时点开 · 会替换现在的名单';
+  $('#importHint').textContent = empty ? '' : 'เปลี่ยนรายชื่อ · 换名单时点开';
   if (importFoldFor !== empty){ imp.open = empty; importFoldFor = empty; }
 }
 function renderPoolList(){
