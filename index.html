@@ -819,6 +819,17 @@ td input{padding:9px 10px;font-size:15px}
 .topbar{border-top:env(safe-area-inset-top,0px) solid transparent}
 /* 下拉菜单 */
 .menu-wrap{position:relative;margin-left:auto}
+.top-tier{display:none;min-width:0}
+@media (max-width:820px){
+  /* 当前奖项和「☰ 菜单」放在同一行:左边奖项、右边菜单;下面那条奖项带(连同后面锁着的几档)不显示 */
+  .top-tier{display:flex;align-items:center;flex:1 1 auto;margin-right:10px}
+  .top-tier .tier{pointer-events:none;max-width:100%;overflow:hidden;white-space:nowrap;padding:9px 15px;border-radius:22px}
+  .top-tier .tier-th{font-size:16px}
+  .top-tier .tier-zh,.top-tier .tier-n{font-size:14.5px}
+  .app:not(.clean):not(.focus) .rail{display:none}
+  .main{grid-template-rows:1fr}
+  .topbar{align-items:center}
+}
 .topbar .menu-btn{display:flex;align-items:center;gap:8px;flex-direction:row;font-size:17px;padding:10px 16px}
 .menu-btn .menu-ic{font-size:20px;line-height:1}
 .menu-btn[aria-expanded="true"]{border-color:var(--pour);background:rgba(var(--glow),.18)}
@@ -891,6 +902,8 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
     <div class="tally">เหลือ 剩余 <b id="tRemain">0</b> / <span id="tTotal">0</span></div>
     <!-- 顶栏的几个功能收进一个下拉菜单(用户要求):右上角一个「☰ 菜单」,点开是一列大按钮。
          按钮 id 没变(bWinners / bTiers / bNames / bSetup / bInstall),原来的点击逻辑照用。 -->
+    <!-- 窄屏(手机 / 竖着的平板):当前这一档奖项放在顶栏左边,和「☰ 菜单」同一行;下面那条奖项带不显示 -->
+    <div class="top-tier" id="topTier"></div>
     <div class="menu-wrap" id="menuWrap">
       <button class="tbtn menu-btn" id="bMenu" aria-haspopup="true" aria-expanded="false">
         <span class="menu-ic">☰</span><span class="l-th">เมนู</span> <span class="l-zh">菜单</span></button>
@@ -1234,7 +1247,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v77';
+var APP_VERSION = 'v78';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1619,6 +1632,13 @@ function renderRail(){
   });
   /* 手机上奖项列表是一条横向滚动带,换档后必须把当前这一档滚进视野 ——
      否则台上抽的是二等奖,顶上还停在已经抽完的三等奖。 */
+  /* 顶栏左边那颗「当前奖项」(窄屏用):直接复制当前这一档的样子 */
+  var top = $('#topTier');
+  if (top){
+    top.innerHTML = '';
+    var on = rail.querySelector('.tier.on');
+    if (on){ var cp = on.cloneNode(true); cp.onclick = null; cp.tabIndex = -1; top.appendChild(cp); }
+  }
   var curBtn = rail.querySelector('.tier.on');
   if (curBtn && curBtn.scrollIntoView){
     try { curBtn.scrollIntoView({ block:'nearest', inline:'center', behavior:'smooth' }); }

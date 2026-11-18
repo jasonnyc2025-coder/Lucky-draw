@@ -151,9 +151,12 @@ module.exports = async function run({ url }) {
           sub: Math.round(parseFloat(getComputedStyle(document.querySelector('.eb-sub')).fontSize)),
           subBg: getComputedStyle(document.querySelector('.eb-sub')).backgroundColor,
           stagePct: Math.round(h('#crucible') / innerHeight * 100),
-          tiersVisible: [...document.querySelectorAll('.tier')].filter(t => {
-            const b = t.getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1; }).length,
-          railScroll: rail.scrollWidth > rail.clientWidth + 1,
+          railShown: getComputedStyle(rail).display !== 'none',
+          topTier: (() => { const t = document.querySelector('#topTier .tier'), m = document.querySelector('#bMenu');
+            if (!t || !m) return null;
+            const a = t.getBoundingClientRect(), b = m.getBoundingClientRect();
+            return { text: t.textContent.replace(/\s+/g, ' ').trim(), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 4,
+                     fits: a.right <= b.left }; })(),
           oneRow: btns.every(b => Math.abs(b.getBoundingClientRect().top - btns[0].getBoundingClientRect().top) < 12),
           /* 每个名字都是一个词(没有空格):应该一行放完,不能被拆成两行 */
           wordsWhole: [...document.querySelectorAll('.ingot .nm')].every(n =>
@@ -167,8 +170,9 @@ module.exports = async function run({ url }) {
       return m;
     };
     const tab = await portrait(755, 1000);
-    R.check('平板竖屏:奖项条缩成一排小药丸(<60px),3 个奖项全看得到、不用横滑',
-            tab.rail < 60 && tab.tiersVisible === 3 && !tab.railScroll, JSON.stringify(tab));
+    R.check('平板竖屏:当前奖项和「☰ 菜单」在顶栏同一行;下面那条奖项带(连同锁着的几档)不显示',
+            !tab.railShown && tab.topTier && tab.topTier.sameRow && tab.topTier.fits && /三等奖/.test(tab.topTier.text),
+            JSON.stringify(tab.topTier));
     R.check('平板竖屏:顶栏一行放得下,舞台占屏幕 75% 以上',
             tab.oneRow && tab.top < 70 && tab.stagePct >= 75, JSON.stringify(tab));
     R.check('平板竖屏:标题下面那行「第几等奖 · 进度」至少 17px(原来 13px 看不清)',
@@ -176,8 +180,9 @@ module.exports = async function run({ url }) {
     R.check('这一行带一层淡淡的主题色底(像一张标签,和大标题分开)',
             /rgba\(.+, 0\.1\d?\)/.test(tab.subBg), tab.subBg);
     const ph = await portrait(390, 844, true);
-    R.check('手机竖屏:顶栏按钮泰文/中文叠两行,一排放下;奖项条很矮,舞台占 65% 以上',
-            ph.oneRow && ph.top < 70 && ph.rail < 60 && ph.noHScroll && ph.stagePct >= 65, JSON.stringify(ph));
+    R.check('手机竖屏:当前奖项 + 「☰ 菜单」一行放下,没有奖项带;舞台占 70% 以上',
+            ph.oneRow && ph.top < 70 && !ph.railShown && ph.topTier && ph.topTier.sameRow && ph.topTier.fits &&
+            ph.noHScroll && ph.stagePct >= 70, JSON.stringify({ top: ph.top, stage: ph.stagePct, t: ph.topTier }));
     R.check('手机窄卡上泰文名字不会从词中间拆开(原来 ณรงค์ 变成「ณรง / ค์」)',
             ph.wordsWhole && !ph.nmTooWide, JSON.stringify(ph));
 
