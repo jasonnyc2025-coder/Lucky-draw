@@ -268,12 +268,13 @@ input,select{font:inherit;color:inherit}
 
 .eyebrow{
   margin-top:auto;                 /* 和下面 .slots 的 margin-bottom:auto 一起,把内容居中 */
-  margin-bottom:20px;text-align:center;position:relative;z-index:2;
+  /* 和下面的名字卡拉开一点(原来 20px,标题贴着名字) */
+  margin-bottom:clamp(30px, 4.5vh, 64px);text-align:center;position:relative;z-index:2;
 }
 /* 主行:当前抽的是哪个奖,投影上要看得清 */
 .eb-main{
   font-family:var(--f-display);font-weight:600;
-  font-size:clamp(21px,calc(3.4vw * var(--sc)),calc(64px * var(--sc)));
+  font-size:clamp(26px,calc(4vw * var(--sc)),calc(72px * var(--sc)));
   line-height:1.25;letter-spacing:.03em;color:var(--bone);
 }
 /* 副行:第几档、抽了几个。
@@ -282,7 +283,7 @@ input,select{font:inherit;color:inherit}
 .eb-sub{
   font-family:var(--f-util);font-weight:600;
   /* 同时受宽度和高度限制:1366×768 这种矮屏上舞台本来就紧,太大会把名字卡挤出去 */
-  font-size:clamp(15px,calc(min(2.4vw, 3.2vh) * var(--sc)),calc(42px * var(--sc)));
+  font-size:clamp(17px,calc(min(2.8vw, 3.4vh) * var(--sc)),calc(44px * var(--sc)));
   line-height:1.3;letter-spacing:.05em;margin-top:.4em;
   /* 一层很淡的主题色底(橙 / 金 / 蓝跟着主题走),把这行和上面的大标题分开,像一张标签。
      底色是半透明的辉光色,文字用亮一档的 --bone,对比度不降反升。 */
@@ -1247,7 +1248,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v78';
+var APP_VERSION = 'v79';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
