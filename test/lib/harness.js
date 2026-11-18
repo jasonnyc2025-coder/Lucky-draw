@@ -210,15 +210,28 @@ function fallbackExe() {
   }
   return null;
 }
+/* 页面里的确认 / 输入框换成了自己画的(按钮要写泰文 + 中文)。老测试都是按浏览器自带的
+   confirm / prompt 写的(page.on('dialog') 里点确定 / 取消 / 填字),所以默认给每个页面打一个
+   window.__nativeDialogs = true,让它退回自带框;要测自己画的那个框,newContext 时传 appDialogs:true。 */
+function wrapBrowser(b) {
+  const nc = b.newContext.bind(b);
+  b.newContext = async (o) => {
+    const opts = Object.assign({}, o || {});
+    const app = !!opts.appDialogs; delete opts.appDialogs;
+    const ctx = await nc(opts);
+    if (!app) await ctx.addInitScript(() => { window.__nativeDialogs = true; });
+    return ctx;
+  };
+  b.newPage = async (o) => (await b.newContext(o)).newPage();
+  return b;
+}
 function chromium() {
   const cr = pwChromium();
   let ok = true;
   try { ok = fs.existsSync(cr.executablePath()); } catch (e) { ok = false; }
-  if (ok) return cr;
-  const exe = fallbackExe();
-  if (!exe) return cr;                 // 找不到就照原样跑,让 playwright 自己报错
+  const exe = ok ? null : fallbackExe();
   return {
-    launch: (opts) => cr.launch(Object.assign({ executablePath: exe }, opts || {})),
+    launch: async (opts) => wrapBrowser(await cr.launch(exe ? Object.assign({ executablePath: exe }, opts || {}) : opts)),
   };
 }
 

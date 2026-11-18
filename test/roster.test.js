@@ -236,9 +236,9 @@ module.exports = async function run({ url }) {
     accept3 = false; dlg3 = [];
     await p3.click('#bClearPool'); await p3.waitForTimeout(300);
     const cancelled9 = await p3.evaluate(() => S.pool.length + S.winners.length);
-    R.check('清空会弹确认框,写明清掉多少人、什么会保留',
-            dlg3.length === 1 && /清空整份名单/.test(dlg3[0]) &&
-            /奖项设置和 Logo 保留/.test(dlg3[0]), (dlg3[0] || '').replace(/\n+/g, ' | '));
+    R.check('清空会弹确认框,只有一句话(用户要求去掉中间那段说明)',
+            dlg3.length === 1 && /清空整份名单/.test(dlg3[0]) && dlg3[0].split('\n').length === 1,
+            (dlg3[0] || '').replace(/\n+/g, ' | '));
     R.check('点取消一个人都不少',
             cancelled9 === before9.pool + before9.winners, 'still ' + cancelled9);
 
@@ -302,6 +302,57 @@ module.exports = async function run({ url }) {
       await pg.click('#bClearPool'); await pg.waitForTimeout(400);
       const e2 = await look();
       R.check('清空名单后又回到「只显示导入」', !e2.pool && e2.importOpen, JSON.stringify(e2));
+      await c.close();
+    }
+
+    // ---------- 自己画的确认 / 输入框:按钮是泰文 + 中文(手机自带的只会写「取消」「好」) ----------
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, appDialogs: true });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      let native = 0;
+      pg.on('dialog', d => { native++; d.dismiss(); });
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(900);
+      await pg.evaluate(() => {
+        S.pool = ['สมชาย', 'มาลี', 'อุดม'].map(n => ({ name: n, sub: '' }));
+        S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
+      });
+      await pg.click('#bNames'); await pg.waitForTimeout(250);
+
+      const hint = await pg.textContent('#secImport .sub:nth-of-type(2) .sub-h em').catch(() => '');
+      R.check('「直接粘贴」下面那行有泰文', /บรรทัดละ/.test(hint) && /一行一人/.test(hint), hint);
+
+      await pg.click('#bClearPool'); await pg.waitForTimeout(250);
+      const box = await pg.evaluate(() => ({
+        on: document.querySelector('#vAsk').classList.contains('on'),
+        msg: document.querySelector('#askMsg').textContent,
+        no: document.querySelector('#askNo').textContent, yes: document.querySelector('#askYes').textContent,
+      }));
+      R.check('清空名单弹的是 App 自己的框,按钮写「ยกเลิก 取消」「ตกลง 确定」',
+              box.on && box.no === 'ยกเลิก 取消' && box.yes === 'ตกลง 确定' && native === 0, JSON.stringify(box));
+      R.check('框里只有一句「清空整份名单?」,中间那段说明没有了',
+              /清空整份名单/.test(box.msg) && box.msg.split('\n').length === 1, box.msg);
+      await pg.click('#askNo'); await pg.waitForTimeout(200);
+      R.check('点「ยกเลิก 取消」:框关掉,名单一个不少,名单面板还开着',
+              await pg.evaluate(() => S.pool.length === 3 && !document.querySelector('#vAsk').classList.contains('on') &&
+                                      document.querySelector('#vNames').classList.contains('on')));
+
+      await pg.click('#bAddPerson'); await pg.waitForTimeout(250);
+      await pg.fill('#askIn', 'สมใจ, 09999');
+      await pg.press('#askIn', 'Enter'); await pg.waitForTimeout(250);
+      R.check('「添加一人」也是自己的框,填完按回车就加进去',
+              await pg.evaluate(() => S.pool.some(p => p.name === 'สมใจ' && p.sub === '09999')) && native === 0);
+
+      await pg.click('#bAddPerson'); await pg.waitForTimeout(250);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      R.check('按 Esc 只关掉这个框,后面的名单面板不受影响',
+              await pg.evaluate(() => !document.querySelector('#vAsk').classList.contains('on') &&
+                                      document.querySelector('#vNames').classList.contains('on') && S.pool.length === 4));
+
+      await pg.click('#bClearPool'); await pg.waitForTimeout(250);
+      await pg.click('#askYes'); await pg.waitForTimeout(300);
+      R.check('点「ตกลง 确定」才真的清空', await pg.evaluate(() => S.pool.length + S.winners.length) === 0);
       await c.close();
     }
 

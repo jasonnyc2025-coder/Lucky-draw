@@ -465,6 +465,15 @@ input,select{font:inherit;color:inherit}
 .app.clean.peek .topbar,
 .app.clean.peek .controls{transform:none;opacity:1;pointer-events:auto}
 
+/* 自己的确认 / 输入框:盖在所有面板上面 */
+.veil.ask{z-index:80}
+.askbox{max-width:420px;padding:22px 20px 18px}
+.ask-msg{font-size:18px;line-height:1.55;color:var(--bone);white-space:pre-line;margin:0 0 18px}
+.ask-in{margin:-4px 0 18px;font-size:17px!important}
+.ask-btns{display:flex;gap:10px}
+.ask-btns button{flex:1 1 0;padding:13px 10px;font-size:16px}
+.ask.danger #askYes{background:var(--warn);border-color:var(--warn);color:#1A0E03}
+
 /* 输密码的小框 */
 .panel.pw{max-width:440px}
 .pw-in{font-size:22px!important;letter-spacing:.2em;text-align:center}
@@ -863,6 +872,20 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
   </div>
 </div>
 
+<!-- ===== 确认 / 输入框 =====
+     手机自带的 confirm / prompt 按钮跟着手机语言走(「取消」「好」),换不了泰文;
+     所以用自己的框,按钮固定写「ยกเลิก 取消」「ตกลง 确定」。 -->
+<div class="veil ask" id="vAsk">
+  <div class="panel askbox" role="dialog" aria-modal="true">
+    <p class="ask-msg" id="askMsg"></p>
+    <input type="text" id="askIn" class="ask-in" hidden>
+    <div class="ask-btns">
+      <button class="ghost" id="askNo">ยกเลิก 取消</button>
+      <button class="solid" id="askYes">ตกลง 确定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== names ===== -->
 <div class="veil" id="vNames">
   <div class="panel">
@@ -908,7 +931,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <div class="drop" id="drop">
           <label class="filepick">เลือกไฟล์ 选择文件<input type="file" id="file" accept=".csv,.xlsx,.xls,.txt,.pdf" hidden></label>
           <p class="drop-tip">ลากไฟล์มาวางได้ · 也可以把文件拖进来</p>
-          <p class="hint" style="margin-top:6px">PDF 要是文字版的,扫描件读不出来</p>
+          <p class="hint" style="margin-top:6px">PDF ต้องเป็นแบบข้อความ ไฟล์สแกนอ่านไม่ได้ · PDF 要是文字版的,扫描件读不出来</p>
         </div>
         <div id="mapWrap" style="display:none;margin-top:16px">
           <p class="hint" style="margin-top:0">把每一列派一个用处。<b style="color:var(--pour)">姓名</b>可以选好几列,
@@ -927,7 +950,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         </div>
 
         <div class="sub">
-        <div class="sub-h"><i>2</i><span>หรือวางรายชื่อ · 或直接粘贴<em>一行一人,可用逗号加工号</em></span></div>
+        <div class="sub-h"><i>2</i><span>หรือวางรายชื่อ · 或直接粘贴<em>บรรทัดละ 1 คน · ใส่ , ต่อด้วยรหัสได้ · 一行一人,可用逗号加工号</em></span></div>
         <textarea id="paste"></textarea>
         <div class="row" style="margin-top:12px">
           <button class="solid" id="bApplyPaste">ใช้รายชื่อนี้ 使用此名单</button>
@@ -1133,7 +1156,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v64';
+var APP_VERSION = 'v65';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1410,6 +1433,36 @@ function el(tag, cls, txt){
   return e;
 }
 var toastTimer;
+/* appConfirm(问题, {ok, danger}) → Promise<true/false>
+   appPrompt(问题, 默认值)          → Promise<文字 / null(点了取消)>
+   测试里 window.__nativeDialogs = true 时退回浏览器自带的框(老测试都是按自带框写的)。 */
+var askDone = null;
+function askOpen(msg, opt, withInput, def){
+  return new Promise(function(res){
+    var v = $('#vAsk'), inp = $('#askIn');
+    $('#askMsg').textContent = msg;
+    $('#askYes').textContent = (opt && opt.ok) || 'ตกลง 确定';
+    v.classList.toggle('danger', !!(opt && opt.danger));
+    inp.hidden = !withInput;
+    if (withInput) inp.value = def || '';
+    askDone = function(ok){
+      askDone = null;
+      v.classList.remove('on');
+      res(withInput ? (ok ? inp.value : null) : ok);
+    };
+    v.classList.add('on');
+    setTimeout(function(){ try { (withInput ? inp : $('#askYes')).focus(); } catch(e){} }, 60);
+  });
+}
+function appConfirm(msg, opt){
+  if (window.__nativeDialogs) return Promise.resolve(confirm(msg));
+  return askOpen(msg, opt, false);
+}
+function appPrompt(msg, def){
+  if (window.__nativeDialogs) return Promise.resolve(prompt(msg, def));
+  return askOpen(msg, null, true, def);
+}
+
 function toast(msg){
   var t = $('#toast'); t.textContent = msg; t.classList.add('on');
   clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2600);
@@ -2518,9 +2571,8 @@ function renderPoolList(){
 function editPerson(kind, idx){
   var cur = kind === 'pool' ? S.pool[idx] : S.winners[idx];
   if (!cur) return;
-  var line = prompt(
-    'แก้ไขรายชื่อ · 修改\n\n格式:姓名, 工号(工号可以留空)',
-    cur.name + (cur.sub ? ', ' + cur.sub : ''));
+  appPrompt('แก้ไขรายชื่อ · 修改\nชื่อ, รหัส · 姓名, 工号(工号可以留空)',
+            cur.name + (cur.sub ? ', ' + cur.sub : '')).then(function(line){
   if (line === null) return;                       // 点了取消
   var parts = String(line).split(/[,,\t]/);
   var name = (parts[0] || '').trim();
@@ -2544,10 +2596,11 @@ function editPerson(kind, idx){
   renderPoolList(); renderRail();
   if (allDone()) renderFinalBoard(); else updateControls();
   toast('แก้ไขแล้ว · 已改为 ' + name);
+  });
 }
 
 function addPerson(){
-  var line = prompt('เพิ่มคน · 添加一人\n\n格式:姓名, 工号(工号可以留空)', '');
+  appPrompt('เพิ่มคน · 添加一人\nชื่อ, รหัส · 姓名, 工号(工号可以留空)', '').then(function(line){
   if (line === null) return;
   var parts = String(line).split(/[,,\t]/);
   var name = (parts[0] || '').trim();
@@ -2558,14 +2611,15 @@ function addPerson(){
   var dup = S.pool.concat(S.winners).some(function(x){
     return x.name === name && (x.sub || '') === sub;
   });
-  if (dup && !confirm('มีชื่อนี้แล้ว · 名单里已经有一模一样的了\n\n' +
-                      name + (sub ? '(' + sub + ')' : '') +
-                      '\n\n还要再加一个吗?(同名不同工号是两个人,可以加)')) return;
-
+  (dup ? appConfirm('มีชื่อนี้แล้ว เพิ่มอีกไหม?  名单里已经有了,还要再加一个吗?\n' +
+                    name + (sub ? '(' + sub + ')' : '')) : Promise.resolve(true)).then(function(ok){
+  if (!ok) return;
   S.pool.push({ name: name, sub: sub });
   autosave();
   renderPoolList(); renderRail(); updateControls();
   toast('เพิ่มแล้ว · 已添加 ' + name + ' · 现在共 ' + (S.pool.length + S.winners.length) + ' 人');
+  });
+  });
 }
 
 /* 下次活动重新开始用的:一次清掉所有人和已开出的结果。
@@ -2573,18 +2627,14 @@ function addPerson(){
 function clearRoster(){
   var total = S.pool.length + S.winners.length;
   if (!total){ toast('รายชื่อว่างอยู่แล้ว · 名单已经是空的'); return; }
-  if (!confirm(
-    'ล้างรายชื่อทั้งหมด?  清空整份名单?\n\n' +
-    '会删掉全部 ' + total + ' 人(' + S.pool.length + ' 待抽 / ' + S.winners.length + ' 已中奖),\n' +
-    '已经开出的中奖结果一并清空。\n\n' +
-    '奖项设置和 Logo 保留。\n\n' +
-    '这一步无法撤销。')) return;
-
+  appConfirm('ล้างรายชื่อทั้งหมด?  清空整份名单?', { danger: true }).then(function(ok){
+  if (!ok) return;
   S.pool = []; S.winners = []; S.history = [];
   syncActive();
   autosave();
   renderPoolList(); renderRail(); resetStage();
   toast('ล้างแล้ว · 名单已清空,可以导入新名单了');
+  });
 }
 
 function deletePerson(kind, idx){
@@ -2594,13 +2644,15 @@ function deletePerson(kind, idx){
   }
   var p = S.pool[idx];
   if (!p) return;
-  if (!confirm('ลบออกจากรายชื่อ?  从名单里删除?\n\n' +
-               p.name + (p.sub ? '(' + p.sub + ')' : '') +
-               '\n\n他不再参与后面的抽奖。已经开出的结果不受影响。')) return;
-  S.pool.splice(idx, 1);
+  appConfirm('ลบออกจากรายชื่อ?  从名单里删除?\n' + p.name + (p.sub ? '(' + p.sub + ')' : ''),
+             { danger: true }).then(function(ok){
+  if (!ok) return;
+  var i = S.pool.indexOf(p); if (i < 0) return;
+  S.pool.splice(i, 1);
   autosave();
   renderPoolList(); renderRail(); updateControls();
   toast('ลบแล้ว · 已删除 ' + p.name);
+  });
 }
 
 /* ---------- winners ---------- */
@@ -3311,6 +3363,14 @@ function lockSubmit(){
   });
 }
 $('#lockOk').onclick = lockSubmit;
+$('#askYes').onclick = function(){ if (askDone) askDone(true); };
+$('#askNo').onclick  = function(){ if (askDone) askDone(false); };
+/* 回车 = 确定,Esc = 取消;拦在这里,不让全局的 Esc 去关后面的面板 */
+$('#vAsk').addEventListener('keydown', function(e){
+  if (!askDone) return;
+  if (e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); askDone(true); }
+  else if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); askDone(false); }
+});
 $('#lockPw').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); lockSubmit(); } });
 /* 换 Logo 要弹系统的选图框,浏览器只认「手指直接点」才肯弹;
    输完密码再弹会被拦掉,所以解锁后请再点一次 */
@@ -3354,11 +3414,13 @@ $('#bLockNow').onclick = function(){
   toast('ล็อกแล้ว · 已上锁,改名单、奖项、设置都要输密码');
 };
 $('#bPwOff').onclick = function(){
-  if (!confirm('ยกเลิกรหัสผ่าน?  取消密码?\n\n取消后谁都可以改名单、改奖项、撤销、重置。')) return;
+  appConfirm('ยกเลิกรหัสผ่าน?  取消密码?').then(function(ok){
+  if (!ok) return;
   try { localStorage.removeItem(LOCK_KEY); } catch(e){}
   LOCK.rec = null; LOCK.open = false;
   syncLockUI();
   toast('ยกเลิกรหัสแล้ว · 已取消密码');
+  });
 };
 syncLockUI();
 
@@ -3370,24 +3432,20 @@ function undoAsk(){
   var names = last.people.map(function(p){
     return p.name + (p.sub ? '(' + p.sub + ')' : '');
   }).join('\n');
-  if (!confirm(
-    'ยกเลิกรอบล่าสุด?  撤销上一轮?\n\n' +
-    (t ? tierLabel(t) + '\n' : '') +
-    '这 ' + last.people.length + ' 位的中奖资格会被取消:\n' + names +
-    '\n\n他们会回到待抽池,可以重新抽。')) return;
-  undo();
+  appConfirm('ยกเลิกรอบล่าสุด?  撤销上一轮?\n' + (t ? tierLabel(t) + '\n' : '') + names).then(function(ok){
+    if (ok) undo();
+  });
 }
 $('#bReset').onclick = function(){ guard(resetAsk); };
 function resetAsk(){
   if (!S.winners.length && !S.pool.length) return;
-  if (!confirm(
-    'รีเซ็ตทั้งหมด?  重置全部?\n\n' +
-    '已中奖的 ' + S.winners.length + ' 位会全部作废,和剩下的 ' + S.pool.length +
-    ' 位一起回到待抽池,重新开始。\n名单和奖项设置保留。\n\n这一步无法撤销。')) return;
+  appConfirm('รีเซ็ตทั้งหมด?  重置全部?\nผลที่จับไปจะถูกล้าง · 已中奖的全部作废,从头开始', { danger: true }).then(function(ok){
+  if (!ok) return;
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   syncActive();
   renderRail(); resetStage(); autosave(); toast('รีเซ็ตแล้ว · 已重置');
+  });
 }
 /* 全屏。iPad 的 Safari 只有带 webkit 前缀的版本;iPhone 根本不支持(加到主屏幕后本来就是全屏),
    不支持就把按钮藏起来,免得点了没反应 */
@@ -3463,9 +3521,9 @@ $('#bAddTier').onclick = function(){
 $('#bSaveTiers').onclick = function(){
   if (!S.tiers.length){ toast('ต้องมีอย่างน้อย 1 รางวัล · 至少保留一个奖项'); return; }
   /* 面板里不再写「改动会清空已抽结果」那段说明了,所以真的有结果时当场问一句 */
-  if (S.winners.length && !confirm(
-    'บันทึกแล้วผลที่จับไปจะถูกล้าง  保存后已抽出的结果会清空\n\n' +
-    '已经抽出 ' + S.winners.length + ' 人,保存后他们回到待抽池,从头开始。确定?')) return;
+  (S.winners.length ? appConfirm('บันทึกแล้วผลที่จับไปจะถูกล้าง  保存后已抽出的结果会清空', { danger: true })
+                    : Promise.resolve(true)).then(function(ok){
+  if (!ok) return;
   S.winners.forEach(function(x){ S.pool.push({name:x.name, sub:x.sub}); });
   S.winners = []; S.history = [];
   sortTiersByLevel();            // 改过名字也照样:小奖先抽,特等奖最后
@@ -3473,6 +3531,7 @@ $('#bSaveTiers').onclick = function(){
   renderRail(); resetStage(); autosave();
   $('#vTiers').classList.remove('on');
   toast('บันทึกแล้ว · 已保存');
+  });
 };
 $('#bExport').onclick = exportCSV;
 
@@ -3652,7 +3711,8 @@ $('#autoSave').onchange = function(){
   }
 };
 $('#bClearStore').onclick = function(){
-  if (!confirm('ลบข้อมูลในเครื่องทั้งหมด? 清除本机存档,连同名单、Logo、已中奖名单一起删掉,无法撤销。继续?')) return;
+  appConfirm('ลบข้อมูลในเครื่องทั้งหมด?  清除本机数据?', { danger: true }).then(function(ok){
+  if (!ok) return;
   clearTimeout(saveTimer);
   restoring = true;                       // 清完别立刻又写回去
   DB.del().catch(function(){}).then(function(){
@@ -3666,6 +3726,7 @@ $('#bClearStore').onclick = function(){
     restoring = false;
     storeNote('ลบแล้ว · 本机存档已清除');
     toast('ลบข้อมูลในเครื่องแล้ว · 本机数据已清除');
+  });
   });
 };
 

@@ -329,8 +329,9 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
     await page.waitForTimeout(300);
     const cancelled = await page.evaluate(() => ({ w: S.winners.length, p: S.pool.length }));
     R.check('撤销会弹确认框', dialogs.length === 1, dialogs[0] && dialogs[0].split('\n')[0]);
-    R.check('确认框里写清楚要撤谁',
-            !!dialogs[0] && /撤销上一轮/.test(dialogs[0]) && /中奖资格会被取消/.test(dialogs[0]),
+    R.check('确认框里写清楚要撤谁(列出这一轮的名字)',
+            !!dialogs[0] && /撤销上一轮/.test(dialogs[0]) &&
+            await page.evaluate(m => S.history[S.history.length - 1].people.every(p => m.indexOf(p.name) >= 0), dialogs[0]),
             dialogs[0] && dialogs[0].replace(/\n/g, ' | '));
     R.check('点取消什么都不变',
             cancelled.w === before.w && cancelled.p === before.p, JSON.stringify(cancelled));
@@ -512,10 +513,11 @@ module.exports = async function run({ url, fixtures, staffXlsx }) {
         const bottom = boxes[boxes.length - 1];
         bottom.value = 'รางวัลใหญ่ 特等奖'; bottom.dispatchEvent(new Event('input'));
         document.querySelector('#bSaveTiers').click();
-        return S.tiers.map(t => t.zh);
       });
+      await pg.waitForTimeout(200);                      // 保存要等确认框回话之后才做
+      const sortedNow = await pg.evaluate(() => S.tiers.map(t => t.zh));
       R.check('改了名字再保存,顺序会按奖的大小重排(特等奖还是最后抽)',
-              sorted[sorted.length - 1] === '特等奖' && sorted[0] === '三等奖', JSON.stringify(sorted));
+              sortedNow[sortedNow.length - 1] === '特等奖' && sortedNow[0] === '三等奖', JSON.stringify(sortedNow));
       await c.close();
     }
 
