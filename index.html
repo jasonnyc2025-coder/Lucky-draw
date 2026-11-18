@@ -617,6 +617,10 @@ details.fold:not([open]) > summary::after{transform:rotate(-90deg)}
 #bAddTier small{opacity:.85;color:#062420}
 #bAddTier:hover{background:rgb(var(--add));filter:brightness(1.1);color:#062420}
 :root[data-theme="ink"] #bAddTier{--add:92,190,110}
+/* 奖项设置面板里的泰文放大:按钮字、表头字原来偏小、字距又拉得开,泰文看着更小 */
+#bAddTier,#bSaveTiers{font-size:20px;letter-spacing:.02em}
+#bAddTier small{font-size:15px;letter-spacing:0}
+#vTiers th{font-size:13.5px;letter-spacing:.02em}
 .ttsmore > summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px;
   font-size:13.5px;color:var(--ash);padding:4px 0}
 .ttsmore > summary::-webkit-details-marker{display:none}
@@ -783,12 +787,12 @@ td input{padding:9px 10px;font-size:15px}
   /* 奖项表:去掉上下箭头后把地方让给输入框,名字不再被截成「ราง:」 */
   #vTiers table{table-layout:fixed}
   #vTiers th,#vTiers td{padding-left:3px;padding-right:3px}
-  #vTiers th{letter-spacing:.02em;font-size:11.5px}
+  #vTiers th{letter-spacing:.01em;font-size:13px}
   #vTiers th:nth-child(1){width:52px!important}   /* 表头上写死了 width:9%,不加 !important 压不住 */
   #vTiers th:nth-child(2){width:auto}
-  #vTiers th:nth-child(3),#vTiers th:nth-child(4){width:19%}
-  #vTiers th:nth-child(5){width:28px}
-  #vTiers td input{padding:9px 6px}
+  #vTiers th:nth-child(3),#vTiers th:nth-child(4){width:50px!important}
+  #vTiers th:nth-child(5){width:26px}
+  #vTiers td input{padding:9px 4px 9px 6px}
   #vTiers .ord{font-size:12.5px;white-space:nowrap}
   #vTiers th .nw{white-space:nowrap;display:inline-block}   /* 「顺序」别拆成「顺 / 序」 */
   #vTiers .del{padding:5px 4px}
@@ -1012,7 +1016,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
         <thead><tr>
           <th style="width:9%"><span class="nw">ลำดับ</span> <span class="nw">顺序</span></th>
           <th style="width:52%">ชื่อรางวัล · 奖项名称</th>
-          <th style="width:15%">จำนวน 名额</th><th style="width:15%">ต่อรอบ 每轮</th><th></th>
+          <th style="width:15%"><span class="nw">จำนวน</span> <span class="nw">名额</span></th><th style="width:15%"><span class="nw">ต่อรอบ</span> <span class="nw">每轮</span></th><th></th>
         </tr></thead>
         <tbody id="tierRows"></tbody>
       </table>
@@ -1197,7 +1201,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v74';
+var APP_VERSION = 'v75';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
