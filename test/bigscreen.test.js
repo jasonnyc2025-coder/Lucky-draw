@@ -253,7 +253,7 @@ module.exports = async function run({ url }) {
                 m.minTop >= 59, JSON.stringify(m));
         R.check('iPhone 主屏幕 App:底部按钮在底部横条上面',
                 m.maxBottom <= m.vh - 34, JSON.stringify(m));
-        await pg.click('#bNames'); await pg.waitForTimeout(250);
+        await menu(pg, '#bNames'); await pg.waitForTimeout(250);
         const hd = await pg.evaluate(() => ({
           open: document.querySelector('#vNames').classList.contains('on'),
           close: Math.round(document.querySelector('#vNames [data-close]').getBoundingClientRect().top),

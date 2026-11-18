@@ -102,6 +102,30 @@ module.exports = async function run({ url }) {
     R.check('重名没工号会提醒去核对,而不是悄悄删掉', /重名/.test(st.note), st.note);
     await p.close();
 
+    // ---------- 顶栏收成一个「☰ 菜单」下拉 ----------
+    p = await fresh();
+    const vis = sel => p.evaluate(s => { const e = document.querySelector(s);
+      return !!(e && e.checkVisibility && e.checkVisibility({ checkVisibilityCSS: true })); }, sel);
+    R.check('顶栏平时只有一个「☰ 菜单」,名单 / 奖项 / 设置 / 中奖都收在里面',
+            await vis('#bMenu') && !(await vis('#bNames')) && !(await vis('#bSetup')));
+    await p.click('#bMenu'); await p.waitForTimeout(150);
+    const items = await p.evaluate(() => [...document.querySelectorAll('#menuPop .mitem')]
+      .filter(b => b.style.display !== 'none').map(b => b.textContent.trim()));
+    R.check('点开菜单:中奖 / 奖项设置 / 名单 / 设置 四项,泰文 + 中文',
+            items.length === 4 && /中奖/.test(items[0]) && /奖项设置/.test(items[1]) &&
+            /名单/.test(items[2]) && /设置/.test(items[3]), JSON.stringify(items));
+    await p.mouse.click(600, 600); await p.waitForTimeout(150);
+    R.check('点菜单外面就收起', !(await vis('#bNames')));
+    await p.click('#bMenu'); await p.waitForTimeout(150);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    R.check('按 Esc 也收起', !(await vis('#bNames')));
+    await p.click('#bMenu'); await p.waitForTimeout(150);
+    await p.click('#bTiers'); await p.waitForTimeout(250);
+    R.check('点菜单里的一项:打开对应面板,菜单自己收起',
+            await p.evaluate(() => document.querySelector('#vTiers').classList.contains('on') &&
+                                   document.querySelector('#menuPop').hidden));
+    await p.close();
+
     // 电脑上(有鼠标)提示条还在底部,不挡舞台中间
     p = await fresh();
     await p.evaluate(() => toast('测试提示 · ทดสอบ'));

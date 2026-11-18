@@ -286,12 +286,12 @@ module.exports = async function run({ url }) {
                  helpOpen: document.querySelector('.howto').open,
                  actH: [...document.querySelectorAll('#secPool .act')].map(b => Math.round(b.getBoundingClientRect().height)) };
       });
-      await pg.click('#bNames'); await pg.waitForTimeout(250);
+      await menu(pg, '#bNames'); await pg.waitForTimeout(250);
       const e0 = await look();
       R.check('还没有名单:只显示「导入名单」,而且直接展开', !e0.pool && e0.importOpen && e0.pasteVis, JSON.stringify(e0));
       await pg.fill('#paste', 'สมชาย,01001\nมาลี,01002\nอุดม,01003');
       await pg.click('#bApplyPaste'); await pg.waitForTimeout(400);
-      await pg.click('#bNames'); await pg.waitForTimeout(250);
+      await menu(pg, '#bNames'); await pg.waitForTimeout(250);
       const e1 = await look();
       R.check('导入后:当前名单在上面,「导入名单」折起来', e1.pool && !e1.importOpen && !e1.pasteVis, JSON.stringify(e1));
       R.check('按钮说明默认收起,不占地方', !e1.helpOpen);
@@ -318,7 +318,7 @@ module.exports = async function run({ url }) {
         S.pool = ['สมชาย', 'มาลี', 'อุดม'].map(n => ({ name: n, sub: '' }));
         S.winners = []; S.history = []; syncActive(); renderRail(); resetStage();
       });
-      await pg.click('#bNames'); await pg.waitForTimeout(250);
+      await menu(pg, '#bNames'); await pg.waitForTimeout(250);
 
       const hint = await pg.textContent('#secImport .sub:nth-of-type(2) .sub-h em').catch(() => '');
       R.check('「直接粘贴」下面那行有泰文', /บรรทัดละ/.test(hint) && /一行一人/.test(hint), hint);

@@ -239,9 +239,12 @@ function chromium() {
 /* 结束总榜会把上下菜单收起来(点一下屏幕才浮出来)。
    测试里点菜单按钮之前先让菜单浮出来 —— 跟现场的人先点一下屏幕是一样的;不在总榜时什么都不做。 */
 async function menu(page, sel){
-  await page.evaluate(() => {
+  await page.evaluate((s) => {
     if (document.querySelector('.app.clean') && typeof setPeek === 'function') setPeek(true);
-  });
+    /* 名单 / 奖项设置 / 设置 / 中奖 收进了「☰ 菜单」:先把菜单点开,跟现场的人一样 */
+    const t = document.querySelector(s), pop = document.querySelector('#menuPop');
+    if (t && pop && t.closest('#menuPop') && pop.hidden && typeof toggleMenu === 'function') toggleMenu(true);
+  }, sel);
   await page.click(sel);
 }
 

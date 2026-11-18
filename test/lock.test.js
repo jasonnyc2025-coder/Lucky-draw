@@ -3,7 +3,7 @@
    看「中奖」名单、开始抽奖不用。输对一次,到关掉 App 前都不用再输。 */
 'use strict';
 
-const { reporter, chromium } = require('./lib/harness');
+const { reporter, chromium, menu } = require('./lib/harness');
 
 module.exports = async function run({ url }) {
   const R = reporter('管理密码 lock');
@@ -26,12 +26,12 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(800);
 
     // ---------- 默认没有密码 ----------
-    await page.click('#bNames'); await page.waitForTimeout(200);
+    await menu(page, '#bNames'); await page.waitForTimeout(200);
     R.check('默认没设密码,点「名单」直接打开', await on(page, '#vNames') && !(await on(page, '#vLock')));
     await closeAll(page);
 
     // ---------- 设密码:太短、两次不一样都不收 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     R.check('没设密码时,「目前没有设密码,谁拿到……」那行不显示(用户要求去掉)',
             await page.evaluate(() => document.querySelector('#lockState').hidden === true));
     const order = await page.evaluate(() => {
@@ -73,7 +73,7 @@ module.exports = async function run({ url }) {
     await page.click('#bLockNow'); await page.waitForTimeout(250);
     R.check('点「立即上锁」后设置面板关掉', !(await on(page, '#vSetup')));
 
-    await page.click('#bNames'); await page.waitForTimeout(250);
+    await menu(page, '#bNames'); await page.waitForTimeout(250);
     R.check('上锁后点「名单」先弹输密码框,名单没打开',
             await on(page, '#vLock') && !(await on(page, '#vNames')));
 
@@ -87,7 +87,7 @@ module.exports = async function run({ url }) {
             !(await on(page, '#vLock')) && await on(page, '#vNames'));
     await closeAll(page);
 
-    await page.click('#bTiers'); await page.waitForTimeout(200);
+    await menu(page, '#bTiers'); await page.waitForTimeout(200);
     R.check('解锁后再点别的(奖项设置)不用再输',
             await on(page, '#vTiers') && !(await on(page, '#vLock')));
     await closeAll(page);
@@ -107,7 +107,7 @@ module.exports = async function run({ url }) {
     await page.click('#bPour'); await page.waitForTimeout(4500);
     R.check('开始抽奖不用密码', await page.evaluate(() => S.winners.length) === 2 && !(await on(page, '#vLock')));
 
-    await page.click('#bWinners'); await page.waitForTimeout(200);
+    await menu(page, '#bWinners'); await page.waitForTimeout(200);
     R.check('看「中奖」名单不用密码', await on(page, '#vWinners') && !(await on(page, '#vLock')));
     await closeAll(page);
 
@@ -121,7 +121,7 @@ module.exports = async function run({ url }) {
             await page.evaluate(() => S.winners.length) === 2);
     await closeAll(page);
 
-    await page.click('#bSetup'); await page.waitForTimeout(250);
+    await menu(page, '#bSetup'); await page.waitForTimeout(250);
     R.check('「设置」也要密码(不然谁都能进去把密码取消掉)',
             await on(page, '#vLock') && !(await on(page, '#vSetup')));
     await closeAll(page);
@@ -143,7 +143,7 @@ module.exports = async function run({ url }) {
     R.check('解锁后「撤销上一轮」照常生效', await page.evaluate(() => S.winners.length) === 0);
 
     // ---------- 取消密码 ----------
-    await page.click('#bSetup'); await page.waitForTimeout(200);
+    await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.click('#bPwOff'); await page.waitForTimeout(250);
     R.check('取消密码后本机不再存密码',
             await page.evaluate(() => !localStorage.getItem('lucky-draw.lock')) &&
@@ -151,7 +151,7 @@ module.exports = async function run({ url }) {
     await closeAll(page);
     await page.reload({ waitUntil: 'load' });
     await page.waitForTimeout(900);
-    await page.click('#bNames'); await page.waitForTimeout(200);
+    await menu(page, '#bNames'); await page.waitForTimeout(200);
     R.check('取消后重开,点「名单」又直接打开', await on(page, '#vNames') && !(await on(page, '#vLock')));
 
     R.check('全程无 JS 报错', errs.length === 0, errs.join(' || '));
