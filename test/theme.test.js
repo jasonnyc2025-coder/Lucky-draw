@@ -154,7 +154,6 @@ module.exports = async function run({ url }) {
 
     await menu(page, '#bSetup'); await page.waitForTimeout(250);
     await page.fill('#orgMain', 'บริษัท ตัวอย่าง จำกัด');
-    await page.fill('#orgSub', '示例公司');
     await page.waitForTimeout(350);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(250);
     const org = await page.evaluate(() => {
@@ -167,8 +166,9 @@ module.exports = async function run({ url }) {
         line: getComputedStyle(o).borderLeftWidth,
       };
     });
-    R.check('公司名两行都显示在舞台上',
-            org.head === 'flex' && org.main === 'บริษัท ตัวอย่าง จำกัด' && org.sub === '示例公司',
+    R.check('公司名显示在舞台上(只有一行,「第二行」已去掉)',
+            org.head === 'flex' && org.main === 'บริษัท ตัวอย่าง จำกัด' && org.sub === '' &&
+            await page.evaluate(() => !document.querySelector('#orgSub')),
             JSON.stringify(org));
     R.check('Logo 和公司名之间有一条竖线隔开',
             parseFloat(org.line) > 0, 'border-left: ' + org.line);

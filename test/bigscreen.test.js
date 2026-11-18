@@ -28,7 +28,6 @@ module.exports = async function run({ url }) {
     await page.evaluate(v => applyScale(v, true), scale);
     await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.fill('#orgMain', 'Bergsoe Metals Co Ltd');
-    await page.fill('#orgSub', 'บริษัท เบิร์กโซ เมททัลส์ จำกัด');
     await page.waitForTimeout(200);
     await page.click('#vSetup [data-close]'); await page.waitForTimeout(200);
     await menu(page, '#bNames'); await page.waitForTimeout(200);

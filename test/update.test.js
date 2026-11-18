@@ -83,9 +83,6 @@ module.exports = async function run({ url, fixtures }) {
     const toastTxt = await peek(page, () => document.querySelector('#toast').textContent, '');
     R.check('更新完有提示,用户知道刚才屏幕闪了一下是在干嘛',
             /已更新到/.test(toastTxt), toastTxt);
-    R.check('更新完「有新版本」按钮收起来了',
-            await peek(page, () => document.querySelector('#bUpdate').style.display === 'none', false),
-            await peek(page, () => document.querySelector('#bUpdate').style.display, '?'));
 
     const ver = await peek(page, () => document.querySelector('#verNote').textContent, '');
     R.check('设置里的版本行显示缓存已是最新', /已是最新/.test(ver), ver.trim());
@@ -129,28 +126,22 @@ module.exports = async function run({ url, fixtures }) {
     const held = await peek(page, () => ({
       alive: !!window.__alive,                       // 页面没被刷掉
       paste: document.querySelector('#paste').value, // 输入的内容还在
-      btn: document.querySelector('#bUpdate').style.display !== 'none',
       appSec: !document.querySelector('#appSec').hidden,
-      checkBtn: !document.querySelector('#bCheckUpd').hidden,
       ver: window.swVersion,
     }), {});
     R.check('面板开着、粘贴框有内容时,绝不自动刷新(不然输入的名单会没)',
             held.alive && held.paste === '正在输入的名单, X1', JSON.stringify(held));
-    R.check('这时候只把「有新版本」按钮亮出来,等用户自己点',
-            held.btn, 'btn=' + held.btn);
-    R.check('平时藏着的「应用」这时才露出来,里面只有「有新版本」(没有检查更新按钮)',
-            held.appSec && !held.checkBtn, JSON.stringify(held));
+    R.check('设置里也不冒出「有新版本,点此更新」那一块(用户要求删掉)',
+            held.appSec === false, JSON.stringify(held));
 
-    // 关掉面板、清空输入,点那个按钮应该真的能更新(原来这里有 bug:按钮亮着但点了没反应)
+    // 关掉面板、清空输入:还在刚打开的那一分半钟里,一安全就自己换上新版本(不用点任何按钮)
     if (await page.isVisible('#paste')) await openImport(page); await page.fill('#paste', '');
     if (await page.isVisible('#vNames [data-close]')){
       await page.click('#vNames [data-close]'); await page.waitForTimeout(300);
     }
-    await menu(page, '#bSetup'); await page.waitForTimeout(250);
-    await page.click('#bUpdate');
-    const manual = await until(page, () => window.swVersion === 'v-next-2', 30000);
-    R.check('手动点「有新版本」确实能更新(回归:以前按钮亮着点了没反应)', manual,
-            manual ? 'v-next-2' : '停在 ' + await peek(page, () => window.swVersion, '?'));
+    const auto2 = await until(page, () => window.swVersion === 'v-next-2', 30000);
+    R.check('面板一关(还在刚打开的时候)就自动换上新版本,不用点按钮', auto2,
+            auto2 ? 'v-next-2' : '停在 ' + await peek(page, () => window.swVersion, '?'));
     await page.close();
 
     // ================= 3. 抽奖滚动中更不能刷新 =================

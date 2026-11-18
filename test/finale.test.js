@@ -197,7 +197,6 @@ module.exports = async function run({ url }) {
       });
       await menu(page, '#bSetup'); await page.waitForTimeout(220);
       await page.fill('#orgMain', 'บริษัท ทดสอบ จำกัด');
-      await page.fill('#orgSub', '测试公司');
       await page.waitForTimeout(400);
       await page.click('#vSetup [data-close]'); await page.waitForTimeout(500);
       const after = await page.evaluate(() => {
