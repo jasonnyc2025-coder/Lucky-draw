@@ -339,9 +339,22 @@ module.exports = async function run({ url }) {
                                       document.querySelector('#vNames').classList.contains('on')));
 
       await pg.click('#bAddPerson'); await pg.waitForTimeout(250);
-      await pg.fill('#askIn', 'สมใจ, 09999');
-      await pg.press('#askIn', 'Enter'); await pg.waitForTimeout(250);
-      R.check('「添加一人」也是自己的框,填完按回车就加进去',
+      const form = await pg.evaluate(() => ({
+        title: document.querySelector('#askMsg').textContent,
+        labels: [...document.querySelectorAll('#askForm .ask-fld > span')].map(s => s.textContent.trim()),
+      }));
+      R.check('「添加一人」:标题一句话,姓名、工号分成两个有标签的框(不用记逗号格式)',
+              form.title === 'เพิ่มคน · 添加一人' && form.labels.length === 2 &&
+              /姓名/.test(form.labels[0]) && /工号/.test(form.labels[1]), JSON.stringify(form));
+      await pg.click('#askYes'); await pg.waitForTimeout(200);
+      R.check('姓名没填就点确定:框不关,提示「请填写姓名」',
+              await pg.evaluate(() => document.querySelector('#vAsk').classList.contains('on') &&
+                                      /请填写姓名/.test(document.querySelector('#askErr').textContent)));
+      await pg.fill('#askName', 'สมใจ');
+      await pg.press('#askName', 'Enter');                       // 回车跳到工号框
+      await pg.keyboard.type('09999');
+      await pg.keyboard.press('Enter'); await pg.waitForTimeout(250);
+      R.check('填姓名 → 回车 → 填工号 → 回车,就加进去了',
               await pg.evaluate(() => S.pool.some(p => p.name === 'สมใจ' && p.sub === '09999')) && native === 0);
 
       await pg.click('#bAddPerson'); await pg.waitForTimeout(250);

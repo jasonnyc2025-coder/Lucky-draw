@@ -469,7 +469,11 @@ input,select{font:inherit;color:inherit}
 .veil.ask{z-index:80}
 .askbox{max-width:420px;padding:22px 20px 18px}
 .ask-msg{font-size:18px;line-height:1.55;color:var(--bone);white-space:pre-line;margin:0 0 18px}
-.ask-in{margin:-4px 0 18px;font-size:17px!important}
+.ask-fld{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.ask-fld span{font-size:14px;color:var(--ash);font-family:var(--f-util);letter-spacing:.04em}
+.ask-fld em{font-style:normal;font-size:12.5px;opacity:.8;margin-left:4px}
+.ask-fld input{font-size:18px!important;padding:12px!important}
+.ask-err{color:#F08E7E;font-size:14px;min-height:1.2em;margin:-6px 0 10px}
 .ask-btns{display:flex;gap:10px}
 .ask-btns button{flex:1 1 0;padding:13px 10px;font-size:16px}
 .ask.danger #askYes{background:var(--warn);border-color:var(--warn);color:#1A0E03}
@@ -886,7 +890,14 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 <div class="veil ask" id="vAsk">
   <div class="panel askbox" role="dialog" aria-modal="true">
     <p class="ask-msg" id="askMsg"></p>
-    <input type="text" id="askIn" class="ask-in" hidden>
+    <!-- 添加一人 / 改名:姓名、工号分成两个框,不用记「逗号隔开」的格式 -->
+    <div id="askForm" hidden>
+      <label class="ask-fld"><span>ชื่อ · 姓名</span>
+        <input type="text" id="askName" autocomplete="off" enterkeyhint="next"></label>
+      <label class="ask-fld"><span>รหัสพนักงาน · 工号 <em>ไม่ใส่ก็ได้ · 可不填</em></span>
+        <input type="text" id="askSub" autocomplete="off" enterkeyhint="done"></label>
+      <p class="ask-err" id="askErr"></p>
+    </div>
     <div class="ask-btns">
       <button class="ghost" id="askNo">ยกเลิก 取消</button>
       <button class="solid" id="askYes">ตกลง 确定</button>
@@ -1164,7 +1175,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v68';
+var APP_VERSION = 'v69';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -1441,34 +1452,45 @@ function el(tag, cls, txt){
   return e;
 }
 var toastTimer;
-/* appConfirm(问题, {ok, danger}) → Promise<true/false>
-   appPrompt(问题, 默认值)          → Promise<文字 / null(点了取消)>
+/* appConfirm(问题, {danger})         → Promise<true/false>
+   appPerson(标题, 姓名, 工号)        → Promise<{name, sub} / null(点了取消)>
    测试里 window.__nativeDialogs = true 时退回浏览器自带的框(老测试都是按自带框写的)。 */
 var askDone = null;
-function askOpen(msg, opt, withInput, def){
+function askOpen(msg, opt, person){
   return new Promise(function(res){
-    var v = $('#vAsk'), inp = $('#askIn');
+    var v = $('#vAsk'), form = $('#askForm');
     $('#askMsg').textContent = msg;
     $('#askYes').textContent = (opt && opt.ok) || 'ตกลง 确定';
     v.classList.toggle('danger', !!(opt && opt.danger));
-    inp.hidden = !withInput;
-    if (withInput) inp.value = def || '';
+    form.hidden = !person;
+    $('#askErr').textContent = '';
+    if (person){ $('#askName').value = person.name || ''; $('#askSub').value = person.sub || ''; }
     askDone = function(ok){
+      if (ok && person){
+        var name = $('#askName').value.trim();
+        if (!name){ $('#askErr').textContent = 'กรุณาใส่ชื่อ · 请填写姓名'; $('#askName').focus(); return; }
+      }
       askDone = null;
       v.classList.remove('on');
-      res(withInput ? (ok ? inp.value : null) : ok);
+      if (person) res(ok ? { name: $('#askName').value.trim(), sub: $('#askSub').value.trim() } : null);
+      else res(ok);
     };
     v.classList.add('on');
-    setTimeout(function(){ try { (withInput ? inp : $('#askYes')).focus(); } catch(e){} }, 60);
+    setTimeout(function(){ try { (person ? $('#askName') : $('#askYes')).focus(); } catch(e){} }, 60);
   });
 }
 function appConfirm(msg, opt){
   if (window.__nativeDialogs) return Promise.resolve(confirm(msg));
-  return askOpen(msg, opt, false);
+  return askOpen(msg, opt, null);
 }
-function appPrompt(msg, def){
-  if (window.__nativeDialogs) return Promise.resolve(prompt(msg, def));
-  return askOpen(msg, null, true, def);
+function appPerson(title, name, sub){
+  if (window.__nativeDialogs){
+    var line = prompt(title + '\n姓名, 工号', (name || '') + (sub ? ', ' + sub : ''));
+    if (line === null) return Promise.resolve(null);
+    var parts = String(line).split(/[,,\t]/);
+    return Promise.resolve({ name: (parts[0] || '').trim(), sub: (parts[1] || '').trim() });
+  }
+  return askOpen(title, null, { name: name, sub: sub });
 }
 
 function toast(msg){
@@ -2579,12 +2601,9 @@ function renderPoolList(){
 function editPerson(kind, idx){
   var cur = kind === 'pool' ? S.pool[idx] : S.winners[idx];
   if (!cur) return;
-  appPrompt('แก้ไขรายชื่อ · 修改\nชื่อ, รหัส · 姓名, 工号(工号可以留空)',
-            cur.name + (cur.sub ? ', ' + cur.sub : '')).then(function(line){
-  if (line === null) return;                       // 点了取消
-  var parts = String(line).split(/[,,\t]/);
-  var name = (parts[0] || '').trim();
-  var sub  = (parts[1] || '').trim();
+  appPerson('แก้ไข · 修改', cur.name, cur.sub).then(function(v){
+  if (!v) return;                                  // 点了取消
+  var name = v.name, sub = v.sub;
   if (!name){ toast('ชื่อว่างไม่ได้ · 名字不能为空'); return; }
 
   var old = { name: cur.name, sub: cur.sub };
@@ -2608,11 +2627,9 @@ function editPerson(kind, idx){
 }
 
 function addPerson(){
-  appPrompt('เพิ่มคน · 添加一人\nชื่อ, รหัส · 姓名, 工号(工号可以留空)', '').then(function(line){
-  if (line === null) return;
-  var parts = String(line).split(/[,,\t]/);
-  var name = (parts[0] || '').trim();
-  var sub  = (parts[1] || '').trim();
+  appPerson('เพิ่มคน · 添加一人', '', '').then(function(v){
+  if (!v) return;
+  var name = v.name, sub = v.sub;
   if (!name){ toast('ชื่อว่างไม่ได้ · 名字不能为空'); return; }
 
   /* 同名同工号多半是手滑加重了。同名不同工号是两个人,直接放行。 */
@@ -3373,6 +3390,9 @@ $('#askNo').onclick  = function(){ if (askDone) askDone(false); };
 /* 回车 = 确定,Esc = 取消;拦在这里,不让全局的 Esc 去关后面的面板 */
 $('#vAsk').addEventListener('keydown', function(e){
   if (!askDone) return;
+  if (e.key === 'Enter' && e.target && e.target.id === 'askName'){
+    e.preventDefault(); e.stopPropagation(); $('#askSub').focus(); return;    // 姓名填完回车 → 跳到工号
+  }
   if (e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); askDone(true); }
   else if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); askDone(false); }
 });
