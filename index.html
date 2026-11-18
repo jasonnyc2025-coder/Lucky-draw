@@ -1192,7 +1192,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v71';
+var APP_VERSION = 'v72';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -3422,12 +3422,14 @@ function pickLogo(){
 }
 function syncLockUI(){
   var st = $('#lockState'); if (!st) return;
+  /* 没设密码时这行不显示(用户要求去掉);设了密码才显示一句短的状态 */
+  st.hidden = !lockOn();
   if (!lockOn()){
-    st.innerHTML = '目前<b>没有设密码</b>,谁拿到这台设备都能改名单、改奖项、撤销、重置。';
+    st.innerHTML = '没有设密码';
     $('#bPwSet').textContent = 'ตั้งรหัส 设置密码';
   } else {
     st.innerHTML = '<b style="color:var(--pour)">已设密码</b>' +
-      (LOCK.open ? ' · 现在是解锁状态(关掉 App 或点「立即上锁」后重新锁上)' : ' · 已上锁');
+      (LOCK.open ? ' · 现在是解锁状态' : ' · 已上锁');
     $('#bPwSet').textContent = 'เปลี่ยนรหัส 修改密码';
   }
   $('#bLockNow').style.display = lockOn() ? '' : 'none';

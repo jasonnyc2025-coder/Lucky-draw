@@ -32,8 +32,8 @@ module.exports = async function run({ url }) {
 
     // ---------- 设密码:太短、两次不一样都不收 ----------
     await page.click('#bSetup'); await page.waitForTimeout(200);
-    R.check('设置里有「管理密码」这一块,说明目前没设',
-            /没有设密码/.test(await page.textContent('#lockState')));
+    R.check('没设密码时,「目前没有设密码,谁拿到……」那行不显示(用户要求去掉)',
+            await page.evaluate(() => document.querySelector('#lockState').hidden === true));
     const order = await page.evaluate(() => {
       const vis = [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden).map(e => e.id || e.querySelector('.sec-h').textContent.trim());
       return vis.slice(0, 2);
