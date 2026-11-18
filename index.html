@@ -1073,10 +1073,16 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
           <label class="chk"><input type="checkbox" id="ttsOn"> ประกาศชื่อผู้โชคดี · 念出中奖人的名字</label>
           <button class="ghost" id="bTtsTest" style="margin-left:auto">ทดสอบ 试听</button>
         </div>
-        <!-- 语言 / 声音 / 语速一般都留「自动」,平时折起来,只显示当前设置;点开才调 -->
-        <details class="ttsmore" id="ttsMore">
-        <summary><span>ภาษา / เสียง / ความเร็ว · 语言 / 声音 / 语速</span><b id="ttsSum"></b></summary>
-        <div class="row" style="margin-top:12px">
+        <!-- 只留语速。语言固定「自动」(泰文名字用泰语念、中文名字用中文念),声音自动挑女声 ——
+             那两个下拉框和「现在用 …」那行状态说明用户要求去掉,元素藏起来留给代码用。
+             没出声时按「试听」,提示条会直接说原因。 -->
+        <div class="row" style="margin-top:14px">
+          <label class="fld"><span>ความเร็ว · 语速 <b id="ttsRateVal" style="color:var(--pour)">80%</b></span>
+            <input type="range" id="ttsRate" min="50" max="130" step="5" value="80"
+                   style="accent-color:var(--pour);padding:0;border:none;background:none"></label>
+        </div>
+        <div hidden>
+        <div class="row">
           <label class="fld" style="min-width:150px"><span>ภาษา · 语言</span>
             <select id="ttsLang">
               <option value="auto">自动(跟着名字的文字)</option>
@@ -1085,12 +1091,9 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
             </select></label>
           <label class="fld" style="min-width:190px"><span>เสียง · 声音</span>
             <select id="ttsVoice"></select></label>
-          <label class="fld" style="min-width:150px"><span>ความเร็ว · 语速 <b id="ttsRateVal" style="color:var(--pour)">80%</b></span>
-            <input type="range" id="ttsRate" min="50" max="130" step="5" value="80"
-                   style="accent-color:var(--pour);padding:0;border:none;background:none"></label>
         </div>
-        <p class="hint" id="ttsNote" style="margin-top:12px">…</p>
-        </details>
+        <p class="hint" id="ttsNote">…</p>
+        </div>
       </div>
 
       <div class="sec">
@@ -1153,7 +1156,7 @@ html.ios-app .app{position:fixed;inset:0;height:auto}
 
 /* 改 index.html 时把这里加一,并把 sw.js 的 VERSION 改成同一个值。
    两边对不上的话,设置里的版本行会直接告诉用户「你看到的是旧缓存」。 */
-var APP_VERSION = 'v66';
+var APP_VERSION = 'v67';
 var APP_DATE = '2026-08-19';
 var swVersion = null;
 
@@ -3014,9 +3017,6 @@ function renderVoicePick(){
     note.textContent += '  ·  上次播报(' + hm + '):' +
       (TTS.last.ok ? '✓ 出声了' : '✗ 没出声 —— ' + TTS.last.why);
   }
-  ttsSum();
-  /* 出问题(没装语音 / 上次没出声)时自动展开,让人看得到那行原因 */
-  if (/⚠|✗/.test(note.textContent) && $('#ttsMore')) $('#ttsMore').open = true;
 }
 /* 折起来时那一行显示的当前设置,例如「自动 · 自动女声 · 80%」 */
 function ttsSum(){
@@ -3750,7 +3750,9 @@ renderVersion();
     /* 旧版默认 0.95,现场反馈太快。存着的还是旧默认值(没有版本号 = 旧格式)
        就换成新默认 0.8;用户后来自己拉过滑杆的不动。 */
     if (!d.v && TTS.rate === 0.95) TTS.rate = 0.8;
-    TTS.pick = (d.pick && typeof d.pick === 'object') ? d.pick : {};
+    /* 语言、声音的下拉框去掉了:以前选过别的也一律回到「自动」,不然看不到、改不回来 */
+    TTS.lang = 'auto';
+    TTS.pick = {};
   } catch(e){}
   $('#ttsOn').checked = TTS.on;
   $('#ttsLang').value = TTS.lang;

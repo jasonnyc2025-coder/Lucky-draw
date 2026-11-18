@@ -61,14 +61,21 @@ module.exports = async function run({ url }) {
     await page.waitForTimeout(900);
 
     R.check('读到设备上的语音列表', await page.evaluate(() => TTS.voices.length) === 6);
-    const fold = await page.evaluate(() => ({
-      open: document.querySelector('#ttsMore').open,
-      sum: document.querySelector('#ttsSum').textContent,
-      icons: [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden)
-               .every(e => !!e.querySelector('.sec-h .sec-ic')),
-    }));
-    R.check('语言 / 声音 / 语速平时折成一行,只显示当前设置',
-            fold.open === false && /自动.*80%/.test(fold.sum), JSON.stringify(fold));
+    const fold = await page.evaluate(() => {
+      const vis = e => !!(e && e.checkVisibility && e.checkVisibility({ checkVisibilityCSS: true }));
+      document.querySelector('#vSetup').classList.add('on');
+      const r = {
+        lang: vis(document.querySelector('#ttsLang')), voice: vis(document.querySelector('#ttsVoice')),
+        note: vis(document.querySelector('#ttsNote')), rate: vis(document.querySelector('#ttsRate')),
+        test: vis(document.querySelector('#bTtsTest')), on: vis(document.querySelector('#ttsOn')),
+        icons: [...document.querySelectorAll('#vSetup .sec')].filter(e => !e.hidden)
+                 .every(e => !!e.querySelector('.sec-h .sec-ic')),
+      };
+      document.querySelector('#vSetup').classList.remove('on');
+      return r;
+    });
+    R.check('语音播报只留开关、试听、语速;语言 / 声音下拉框和「现在用 …」那行不显示',
+            fold.on && fold.test && fold.rate && !fold.lang && !fold.voice && !fold.note, JSON.stringify(fold));
     R.check('设置里每一块标题前都有图标,一眼分得开', fold.icons === true);
     /* 原来默认关着,得进设置去找 —— 用户以为功能坏了 */
     R.check('语音播报默认是打开的(不用进设置去找)',
@@ -258,8 +265,7 @@ module.exports = async function run({ url }) {
     // ---------- 设置记在本机 ----------
     await menu(page, '#bSetup'); await page.waitForTimeout(200);
     await page.check('#ttsOn');
-    await page.evaluate(() => { document.querySelector('#ttsMore').open = true; });   // 语言 / 语速平时折起来
-    await page.selectOption('#ttsLang', 'zh');
+    await page.evaluate(() => { TTS.lang = 'zh'; TTS.pick = { zh: 'x' }; ttsSave(); });   // 模拟以前存过别的语言 / 声音
     await page.fill('#ttsRate', '110');
     await page.dispatchEvent('#ttsRate', 'input');
     await page.waitForTimeout(300);
@@ -268,11 +274,11 @@ module.exports = async function run({ url }) {
     const kept = await page.evaluate(() => ({
       on: TTS.on, lang: TTS.lang, rate: TTS.rate,
       box: document.querySelector('#ttsOn').checked,
-      sel: document.querySelector('#ttsLang').value,
+      pick: Object.keys(TTS.pick).length,
     }));
-    R.check('开关、语言、语速关掉重开还记得',
-            kept.on && kept.lang === 'zh' && Math.abs(kept.rate - 1.1) < 0.01 &&
-            kept.box && kept.sel === 'zh', JSON.stringify(kept));
+    R.check('开关、语速关掉重开还记得', kept.on && Math.abs(kept.rate - 1.1) < 0.01 && kept.box, JSON.stringify(kept));
+    R.check('以前选过别的语言 / 声音:下拉框没了,重开一律回到「自动」(不会卡在看不见的设置上)',
+            kept.lang === 'auto' && kept.pick === 0, JSON.stringify(kept));
 
     // ---------- 设备上没有对应语言的语音时要说清楚 ----------
     /* 用户明确关掉的,重开后要保持关闭 —— 「默认打开」不能把用户的选择盖掉 */
